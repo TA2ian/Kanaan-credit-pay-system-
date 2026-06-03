@@ -106,6 +106,11 @@ ${instructionSuffix}
         error: 'أداة الذكاء الاصطناعي تحتاج لمفتاح ربط (GEMINI_API_KEY). يرجى التأكد من إضافته في لوحة الإعدادات (Settings > Secrets) في استوديو الذكاء الاصطناعي.',
       });
     }
+    
+    if (error.status === 503 || error.message?.includes('high demand') || error.message?.includes('503')) {
+      return res.status(503).json({ error: "نظام الذكاء الاصطناعي مشغول حالياً بسبب ضغط الطلبات. يرجى المحاولة بعد قليل." });
+    }
+    
     return res.status(500).json({ error: "فشل الاتصال بذكاء كنعان الاصطناعي." });
   }
 }

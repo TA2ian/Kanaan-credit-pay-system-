@@ -14,7 +14,7 @@ import {
   deleteTransaction
 } from '../lib/db';
 import { useFirebase } from '../lib/FirebaseContext';
-import { formatCurrency, formatDate } from '../lib/utils';
+import { formatCurrency, formatDate, formatPhoneNumberForUrl } from '../lib/utils';
 import { 
   Search, 
   UserPlus, 
@@ -37,6 +37,8 @@ import {
   ArrowUpDown,
   Send
 } from 'lucide-react';
+import { QuickActionFAB } from './QuickActionFAB';
+import { StatementPreviewModal } from './StatementPreviewModal';
 
 interface CustomersTabProps {
   db: DatabaseState;
@@ -63,6 +65,15 @@ export function CustomersTab({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [sortType, setSortType] = useState<'default' | 'debt_desc' | 'oldest_debt'>('default');
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  
+  // Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   // Sync initial select request from dashboard clicks
   React.useEffect(() => {
@@ -149,28 +160,15 @@ export function CustomersTab({
       .sort((a, b) => b.date.localeCompare(a.date)); // Newest first
   }, [db.transactions, selectedCustomerId]);
 
-  const handlePrintAccountState = () => {
-    window.print();
-  };
-
   const generateWhatsAppLink = (phone: string, text: string) => {
-    let cleanPhone = phone.trim().replace(/[^\d]/g, '');
-    // Clean leading double zeros
-    cleanPhone = cleanPhone.replace(/^00/, '');
-    
-    // Syrian country code mapping (+963)
-    if (cleanPhone.startsWith('09') && cleanPhone.length === 10) {
-      cleanPhone = '963' + cleanPhone.substring(1);
-    } else if (cleanPhone.startsWith('9') && cleanPhone.length === 9) {
-      cleanPhone = '963' + cleanPhone;
-    }
-    return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`;
+    return `https://wa.me/${formatPhoneNumberForUrl(phone)}?text=${encodeURIComponent(text)}`;
   };
 
-  const handleExportStatementToWhatsApp = () => {
+  const handleExportStatementToWhatsApp = async () => {
     if (!activeCustomerInfo) return;
     const { customer, totalDebt, totalPaid, remainingDebt } = activeCustomerInfo;
 
+    // Create details for WhatsApp transmission
     let text = `💼 *كشف مالي معتمد - مجموعة كنعان الذكية* 🧾\n`;
     text += `*العميل الكريم:* ${customer.name}\n`;
     if (customer.region) {
@@ -182,37 +180,83 @@ export function CustomersTab({
     text += `• إجمالي المسحوبات (الدين): *${formatCurrency(totalDebt)}*\n`;
     text += `• إجمالي المدفوع الموثق: *${formatCurrency(totalPaid)}*\n`;
     text += `-------------------------------------\n`;
+    text += `📂 *المرفق المالي:* تم الآن إصدار وتنزيل كشف الحساب المالي التفصيلي كملف PDF رسمي موقع وموثق باسمكم، يرجى تفقده بالمرفقات. 🌾📎\n\n`;
     text += `أخوكم عبدالرحمن كنعان لتوزيع الأغذية والمشروبات 🌾\n`;
     text += `للاستعلام والطلب: 0958280936 📞`;
 
     window.open(generateWhatsAppLink(customer.phone, text), '_blank');
   };
 
-  const handleDeleteCustomerClicked = async (id: string, name: string) => {
-    if (confirm(`هل أنت متأكد من حذف العميل "${name}" نهائياً من النظام؟\nسيؤدي هذا لحذف كافة ديونة وسجل تعاملاته المحفوظة ولا يمكن التراجع!`)) {
-      if (user) {
-        await deleteCustomerFromFS(id);
-      } else {
-        deleteCustomer(id);
+  const handleDeleteCustomerClicked = (id: string, name: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'حذف العميل',
+      message: `هل أنت متأكد من حذف العميل "${name}" نهائياً من النظام؟ لا يمكن التراجع عن هذا الإجراء!`,
+      onConfirm: async () => {
+        if (user) {
+          await deleteCustomerFromFS(id);
+        } else {
+          deleteCustomer(id);
+        }
+        setSelectedCustomerId(null);
+        onRefresh();
+        setConfirmDialog(null);
       }
-      setSelectedCustomerId(null);
-      onRefresh();
-    }
+    });
   };
 
-  const handleDeleteTxClicked = async (txId: string) => {
-    if (confirm('هل ترغب بالتأكيد في حذف هذا القيد المالي والرجوع عنه؟')) {
-      if (user) {
-        await deleteTransactionFromFS(txId);
-      } else {
-        deleteTransaction(txId);
+  const handleDeleteTxClicked = (txId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'حذف القيد',
+      message: 'هل ترغب بالتأكيد في حذف هذا القيد المالي والرجوع عنه؟',
+      onConfirm: async () => {
+        if (user) {
+          await deleteTransactionFromFS(txId);
+        } else {
+          deleteTransaction(txId);
+        }
+        onRefresh();
+        setConfirmDialog(null);
       }
-      onRefresh();
-    }
+    });
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
+      {/* Statement Preview Modal */}
+      {activeCustomerInfo && (
+        <StatementPreviewModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          balance={activeCustomerInfo}
+          transactions={activeTransactions}
+        />
+      )}
+      
+      {/* Confirmation Dialog Component */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full text-right" dir="rtl">
+            <h3 className="text-lg font-black text-slate-800 mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200"
+              >
+                إلغاء
+              </button>
+              <button 
+                onClick={confirmDialog.onConfirm}
+                className="flex-1 px-4 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs hover:bg-rose-700"
+              >
+                تأكيد الحذف
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* LEFT COLUMN: CUSTOMERS DIRECTORY */}
       <div className={`lg:col-span-1 space-y-4 ${selectedCustomerId ? 'hidden lg:block' : 'block'}`}>
         {/* Actions & Filters Header */}
@@ -414,7 +458,8 @@ export function CustomersTab({
           </div>
         ) : (
           <div className="space-y-5 animate-slide-up bg-white rounded-2xl border border-slate-100 p-6 shadow-xs relative">
-            {/* Back Button (Only seen on mobile/tablet) */}
+            
+        {/* Back Button (Only seen on mobile/tablet) */}
             <button
               onClick={() => setSelectedCustomerId(null)}
               className="lg:hidden flex items-center gap-1 text-xs font-semibold text-indigo-600 mb-3 cursor-pointer"
@@ -473,6 +518,17 @@ export function CustomersTab({
               </div>
             </div>
 
+            <div className="mt-4 mb-4">
+               <button
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="w-full flex justify-center items-center gap-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all cursor-pointer shadow-md text-lg font-black"
+                  title="تصدير كشف حساب"
+                >
+                  <FileText className="w-6 h-6" />
+                  معاينة وتصدير كشف الحساب
+                </button>
+            </div>
+
             {/* Detailed financial status summary for selected customer */}
             <div className="grid grid-cols-3 gap-3 p-4 bg-slate-50 rounded-2xl text-right">
               <div className="space-y-1">
@@ -504,18 +560,11 @@ export function CustomersTab({
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handlePrintAccountState}
-                  className="flex items-center gap-1.5 text-xs font-bold text-slate-650 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl transition-all cursor-pointer"
-                >
-                  <Printer className="w-4 h-4" />
-                  طباعة الكشف
-                </button>
-                <button
                   onClick={handleExportStatementToWhatsApp}
                   className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-xs"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  مشاركة واتساب كنعان 🌾
+                  <span>مشاركة واتساب كنعان 🌾</span>
                 </button>
               </div>
               
@@ -601,85 +650,6 @@ export function CustomersTab({
                   </table>
                 </div>
               )}
-            </div>
-
-            {/* PRINT COMPONENT (HIDDEN IN STANDARD LAYOUT, SHOWN DURING MEDIA PRINT) */}
-            <div className="hidden print:block absolute inset-0 bg-white z-50 p-8 text-right leading-relaxed font-sans" dir="rtl">
-              <div className="flex items-center justify-between border-b-4 border-amber-500 pb-5 mb-6">
-                <div>
-                  <h1 className="text-xl font-black text-slate-900">مجموعة كنعان الذكية لتوزيع الأغذية</h1>
-                  <p className="text-xs font-semibold text-slate-600">كنعان لألبان ولحوم الأجداد • كنعان مندوب 🌾</p>
-                  <p className="text-[10px] text-slate-550 mt-1">الموزع والمندوب المعتمد: عبدالرحمن كنعان | جوال: 0958280936</p>
-                </div>
-                <div className="text-left">
-                  <div className="text-lg font-black text-amber-650">كشف مالي دولي</div>
-                  <div className="text-[10px] mt-1 text-slate-500">تاريخ الطباعة: {new Date().toLocaleDateString('ar-SA')}</div>
-                  <div className="text-[9px] text-slate-400 mt-0.5">رمز كنعان الفريد: KAN-{activeCustomerInfo.customer.id.substring(0, 5).toUpperCase()}</div>
-                </div>
-              </div>
-              
-              <div className="mb-6 grid grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-xl border border-slate-205">
-                <div className="space-y-1">
-                  <div><strong>اسم العميل الكريم:</strong> {activeCustomerInfo.customer.name}</div>
-                  {activeCustomerInfo.customer.region && <div><strong>المنطقة / المدينة:</strong> {activeCustomerInfo.customer.region}</div>}
-                  <div><strong>جوال الاتصال:</strong> {activeCustomerInfo.customer.phone}</div>
-                </div>
-                <div className="space-y-1">
-                  {activeCustomerInfo.customer.email && <div><strong>البريد الإلكتروني:</strong> {activeCustomerInfo.customer.email}</div>}
-                  <div><strong>حالة المديونية:</strong> {activeCustomerInfo.remainingDebt > 0 ? 'ذمة مالية معلقة ⚠️' : 'خالص المسدد بالكامل ✓'}</div>
-                  <div><strong>ملاحظات الحساب:</strong> {activeCustomerInfo.customer.notes || '---'}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 text-center p-3 border border-slate-300 rounded mb-6 text-xs bg-slate-100">
-                <div>
-                  <div className="font-bold text-slate-650">إجمالي المديونية</div>
-                  <div className="text-slate-800 font-extrabold">{formatCurrency(activeCustomerInfo.totalDebt)}</div>
-                </div>
-                <div>
-                  <div className="font-bold text-slate-650">إجمالي المسدد</div>
-                  <div className="text-emerald-700 font-extrabold">✓ {formatCurrency(activeCustomerInfo.totalPaid)}</div>
-                </div>
-                <div>
-                  <div className="font-bold text-slate-850">الرصيد المتبقي ذمة</div>
-                  <div className="font-black text-rose-650 underline decoration-double">{formatCurrency(activeCustomerInfo.remainingDebt)}</div>
-                </div>
-              </div>
-
-              <table className="w-full text-xs text-right border-collapse border border-slate-300">
-                <thead>
-                  <tr className="bg-slate-200">
-                    <th className="border border-slate-300 p-2 font-black">التاريخ</th>
-                    <th className="border border-slate-300 p-2 font-black">نوع الحركة</th>
-                    <th className="border border-slate-300 p-2 font-black">البيان والتفاصيل</th>
-                    <th className="border border-slate-300 p-2 font-black">تاريخ الاستحقاق</th>
-                    <th className="border border-slate-300 p-2 font-black">القيمة الموثقة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeTransactions.map((tx) => (
-                    <tr key={tx.id}>
-                      <td className="border border-slate-300 p-2">{tx.date}</td>
-                      <td className="border border-slate-300 p-2 font-bold">{tx.type === 'debt' ? '🚚 سحب بضاعة بالآجل' : '💰 سداد دفعة نقدية'}</td>
-                      <td className="border border-slate-300 p-2 font-medium text-slate-600">{tx.notes || '---'}</td>
-                      <td className="border border-slate-300 p-2">{tx.dueDate || '---'}</td>
-                      <td className={`border border-slate-300 p-2 font-bold ${tx.type === 'debt' ? 'text-rose-600' : 'text-emerald-700'}`}>{formatCurrency(tx.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="mt-16 flex justify-between items-end text-xs">
-                <div>
-                  <p className="font-bold">توقيع العميل المستلم والمقر بالدين:</p>
-                  <p className="mt-12 border-b border-dashed border-slate-400 w-48"></p>
-                </div>
-                <div className="text-left text-[11px] text-slate-650">
-                  <p>الختم والتوقيع الرسمي لمجموعة كنعان الذكية</p>
-                  <p className="font-bold text-slate-805">مندوب التوزيع: عبدالرحمن كنعان</p>
-                  <p className="pt-2 italic text-[9px] text-slate-400">تم التوليد وإصدار الفاتورة بواسطة النظام مبرمجة سحابياً.</p>
-                </div>
-              </div>
             </div>
 
           </div>

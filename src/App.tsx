@@ -22,6 +22,7 @@ import { UtilitiesTab } from './components/UtilitiesTab';
 import { CustomerModal, TransactionModal } from './components/Modals';
 import { useFirebase } from './lib/FirebaseContext';
 import { LoginScreen } from './components/LoginScreen';
+import { QuickActionFAB } from './components/QuickActionFAB';
 import { 
   LayoutDashboard, 
   Users, 
@@ -119,6 +120,13 @@ export default function App() {
     if (!customer) return;
     setTxCustomerId(customerId);
     setTxCustomerName(customer.name);
+    setTxType(type);
+    setIsTxModalOpen(true);
+  };
+
+  const triggerAddGenericTransaction = (type: TransactionType) => {
+    setTxCustomerId('');
+    setTxCustomerName('');
     setTxType(type);
     setIsTxModalOpen(true);
   };
@@ -419,7 +427,6 @@ export default function App() {
 
           {activeTab === 'utilities' && (
             <UtilitiesTab
-              db={db}
               onRefresh={() => {}}
               isOfflineSimulated={isOfflineSimulated}
               onToggleOfflineSimulated={handleToggleOffline}
@@ -429,13 +436,17 @@ export default function App() {
 
         {/* E. FOOTER */}
         <footer className="bg-white border-t border-slate-100 text-center py-4 text-slate-400 text-[10px] shrink-0 font-medium space-y-1">
-          <p>مجموعة كنعان للألبان ولحوم الأجداد © ٢٠٢٦ | المندوب عبدالرحمن كنعان 🌾 هاتف: 0958280936</p>
+          <p>كنعان لتوزيع المواد الغذائية والمشروبات © ٢٠٢٦ | المندوب عبدالرحمن كنعان 🌾 هاتف: 0958280936</p>
           <p className="text-[9px] text-slate-350">حقوق الحسابات والنظام مطورة ومحفوظة بالكامل لسلسلة التوزيع البرية</p>
         </footer>
 
       </div>
 
       {/* F. MODALS dialog controller */}
+      <QuickActionFAB 
+          onAddDebt={() => triggerAddGenericTransaction('debt')}
+          onAddPayment={() => triggerAddGenericTransaction('payment')}
+      />
       <CustomerModal
         isOpen={isCustomerModalOpen}
         onClose={() => {
@@ -449,6 +460,7 @@ export default function App() {
       <TransactionModal
         isOpen={isTxModalOpen}
         onClose={() => setIsTxModalOpen(false)}
+        customers={db.customers}
         customerId={txCustomerId}
         customerName={txCustomerName}
         type={txType}

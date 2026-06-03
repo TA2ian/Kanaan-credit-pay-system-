@@ -1,20 +1,17 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+// /lib/db.ts
 
-// Types matching the Arab merchant debt management system
 export interface Customer {
   id: string;
   name: string;
   phone: string;
   email?: string;
   notes?: string;
-  region?: string; // المنطقة أو المدينة
+  region: string;
+  totalDebt: number;
   createdAt: string;
 }
 
-export type TransactionType = 'debt' | 'payment'; // 'debt' = دين جديد, 'payment' = سداد دفعة
+export type TransactionType = 'debt' | 'payment';
 
 export interface Transaction {
   id: string;
@@ -22,158 +19,36 @@ export interface Transaction {
   type: TransactionType;
   amount: number;
   date: string;
-  dueDate?: string; // Only relevant for debts (تاريخ الاستحقاق)
+  dueDate?: string;
   notes?: string;
 }
 
+export interface Debt {
+  id: string;
+  customerId: string;
+  totalAmount: number;
+  remainingAmount: number;
+  dueDate: string;
+  notes: string;
+  status: 'unpaid' | 'partial' | 'paid';
+  createdAt: string;
+}
+
+export interface Payment {
+  id: string;
+  debtId: string;
+  customerId: string;
+  amountPaid: number;
+  paymentDate: string;
+  notes: string;
+}
+
 export interface DatabaseState {
+  version: number;
   customers: Customer[];
   transactions: Transaction[];
-  version: number;
 }
 
-const STORAGE_KEY = 'daftar_al_duyun_db';
-
-// High-quality Saudi/Arab merchant sample data to populate empty DB
-const SAMPLE_DATA: DatabaseState = {
-  version: 1,
-  customers: [
-    {
-      id: 'cust-1',
-      name: 'عبدالرحمن بن محمد العتيبي',
-      phone: '+966501234567',
-      email: 'alotaibi@example.com',
-      notes: 'عميل دائم وموثوق، صاحب سوبرماركت العتيبي',
-      region: 'الرياض',
-      createdAt: '2026-05-10T08:30:00Z',
-    },
-    {
-      id: 'cust-2',
-      name: 'فاطمة أحمد الزهراني',
-      phone: '+966541234567',
-      email: 'fatimah.z@example.com',
-      notes: 'طلب توريد منزلي شهري',
-      region: 'جدة',
-      createdAt: '2026-05-15T10:15:00Z',
-    },
-    {
-      id: 'cust-3',
-      name: 'مؤسسة خالد التجارية (أبو فهد)',
-      phone: '+966561234567',
-      email: 'khaled.est@example.com',
-      notes: 'مشتريات مواد بناء بالآجل',
-      region: 'الشرقية',
-      createdAt: '2026-05-20T14:45:00Z',
-    },
-    {
-      id: 'cust-4',
-      name: 'صالح بن علي البارقي',
-      phone: '+966555551234',
-      email: 'saleh.barqi@example.com',
-      notes: 'يطلب تفصيل أثاث مكتبي، ملتزم بالدفع',
-      region: 'عسير',
-      createdAt: '2026-05-25T11:00:00Z',
-    }
-  ],
-  transactions: [
-    // Customer 1: Abdurrahman (Needs 4500 debt, paid 2000 => Remaining 2500)
-    {
-      id: 'tx-101',
-      customerId: 'cust-1',
-      type: 'debt',
-      amount: 4500,
-      date: '2026-05-11',
-      dueDate: '2026-06-15',
-      notes: 'شراء بضاعة بوزن طن واحد دقيق وسكر آجل',
-    },
-    {
-      id: 'tx-102',
-      customerId: 'cust-1',
-      type: 'payment',
-      amount: 2000,
-      date: '2026-05-25',
-      notes: 'دفعة أولى نقداً',
-    },
-    // Customer 2: Fatimah (Needs 1200 debt => Remaining 1200)
-    {
-      id: 'tx-103',
-      customerId: 'cust-2',
-      type: 'debt',
-      amount: 1200,
-      date: '2026-05-16',
-      dueDate: '2026-06-05',
-      notes: 'طلب كعك وتجهيز حفلة تخرج عائلية',
-    },
-    // Customer 3: Khaled Est (Needs 15000 debt, paid 8500 => Remaining 6500, overdue)
-    {
-      id: 'tx-104',
-      customerId: 'cust-3',
-      type: 'debt',
-      amount: 15000,
-      date: '2026-05-21',
-      dueDate: '2026-05-30', // Overdue relative to current date (2026-06-03)
-      notes: 'تسليم دفعة طوب وأسمنت رمادي',
-    },
-    {
-      id: 'tx-105',
-      customerId: 'cust-3',
-      type: 'payment',
-      amount: 8500,
-      date: '2026-05-28',
-      notes: 'تحويل بنكي على مصرف الراجحي',
-    },
-    // Customer 4: Saleh (Paid completely, 3000 debt, 3000 paid => 0 remaining)
-    {
-      id: 'tx-106',
-      customerId: 'cust-4',
-      type: 'debt',
-      amount: 3000,
-      date: '2026-05-26',
-      dueDate: '2026-06-10',
-      notes: 'تفصيل طاولات اجتماعات عدد ٢',
-    },
-    {
-      id: 'tx-107',
-      customerId: 'cust-4',
-      type: 'payment',
-      amount: 3000,
-      date: '2026-06-01',
-      notes: 'سداد كامل الحساب نقداً والحمد لله',
-    }
-  ]
-};
-
-// Initialize or read DB
-export function getDatabase(): DatabaseState {
-  if (typeof window === 'undefined') {
-    return { customers: [], transactions: [], version: 1 };
-  }
-  const data = localStorage.getItem(STORAGE_KEY);
-  if (!data) {
-    saveDatabase(SAMPLE_DATA);
-    return SAMPLE_DATA;
-  }
-  try {
-    const parsed = JSON.parse(data) as DatabaseState;
-    if (!parsed.customers || !parsed.transactions) {
-      saveDatabase(SAMPLE_DATA);
-      return SAMPLE_DATA;
-    }
-    return parsed;
-  } catch (e) {
-    console.error('Error parsing debt database, reinitializing...', e);
-    saveDatabase(SAMPLE_DATA);
-    return SAMPLE_DATA;
-  }
-}
-
-export function saveDatabase(state: DatabaseState): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }
-}
-
-// Helpers for computation
 export interface CustomerBalance {
   customer: Customer;
   totalDebt: number;
@@ -183,8 +58,128 @@ export interface CustomerBalance {
   isOverdue: boolean;
 }
 
+export interface FinancialSummary {
+  grandTotalDebt: number;
+  grandTotalPaid: number;
+  grandTotalRemaining: number;
+  overdueCount: number;
+  activeCustomersCount: number;
+}
+
+const CUSTOMERS_KEY = 'kanaan_customers_v1';
+const DEBTS_KEY = 'kanaan_debts_v1';
+const PAYMENTS_KEY = 'kanaan_payments_v1';
+const STORAGE_KEY = 'daftar_al_duyun_db';
+
+// عينة البيانات التجريبية الافتراضية
+const SAMPLE_CUSTOMERS: Customer[] = [
+  { id: 'cust-1', name: 'سوبرماركت الياسمين (أبو محمد)', phone: '+963933111222', region: 'دمشق القديم - باب توما', totalDebt: 950, createdAt: '2026-04-10T10:00:00Z' },
+  { id: 'cust-2', name: 'بقالة الخير والبركة (هاني المصري)', phone: '+963955666777', region: 'الميدان - الشارع العام', totalDebt: 450, createdAt: '2026-04-15T11:30:00Z' }
+];
+
+export function getDatabase(): DatabaseState {
+    if (typeof window === 'undefined') return { version: 1, customers: [], transactions: [] };
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : { version: 1, customers: [], transactions: [] };
+}
+
+export function saveDatabase(state: DatabaseState): void {
+  if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function isClient(): boolean {
+  return typeof window !== 'undefined';
+}
+
+export function initializeDatabase(forceReset = false) {
+  if (!isClient()) return;
+  if (forceReset || !localStorage.getItem(CUSTOMERS_KEY)) {
+    localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(SAMPLE_CUSTOMERS));
+  }
+}
+
+export function getCustomers(): Customer[] {
+  if (!isClient()) return [];
+  initializeDatabase();
+  return JSON.parse(localStorage.getItem(CUSTOMERS_KEY) || '[]');
+}
+
+export function saveCustomers(customers: Customer[]) {
+  if (isClient()) localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
+}
+
+export function getDebts(): Debt[] {
+  if (!isClient()) return [];
+  initializeDatabase();
+  return JSON.parse(localStorage.getItem(DEBTS_KEY) || '[]');
+}
+
+export function saveDebts(debts: Debt[]) {
+  if (isClient()) localStorage.setItem(DEBTS_KEY, JSON.stringify(debts));
+}
+
+export function getPayments(): Payment[] {
+  if (!isClient()) return [];
+  initializeDatabase();
+  return JSON.parse(localStorage.getItem(PAYMENTS_KEY) || '[]');
+}
+
+export function savePayments(payments: Payment[]) {
+  if (isClient()) localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments));
+}
+
+// إضافة عميل جديد
+export function addCustomer(name: string, phone: string, email: string, notes: string, region: string): Customer {
+  const list = getCustomers();
+  const index = `cust-${Date.now()}`;
+  const newCustomer: Customer = { id: index, name, phone, region, totalDebt: 0, createdAt: new Date().toISOString(), email, notes };
+  list.push(newCustomer);
+  saveCustomers(list);
+  return newCustomer;
+}
+
+export function updateCustomer(id: string, name: string, phone: string, email: string, notes: string, region: string): Customer {
+  const list = getCustomers();
+  const index = list.findIndex(c => c.id === id);
+  if (index === -1) throw new Error('Customer not found');
+  list[index] = { ...list[index], name, phone, email, notes, region };
+  saveCustomers(list);
+  return list[index];
+}
+
+export function addTransaction(customerId: string, type: TransactionType, amount: number, notes?: string, dueDate?: string): Transaction {                
+  const db = getDatabase();
+  const newTx: Transaction = {
+    id: 'tx-' + Date.now(),
+    customerId,
+    type,
+    amount,
+    date: new Date().toISOString().split('T')[0],
+    dueDate: type === 'debt' ? dueDate : undefined,
+    notes: notes?.trim() || undefined,
+  };
+  db.transactions.push(newTx);
+  saveDatabase(db);
+  return newTx;
+}
+
+export function deleteCustomer(id: string) {
+  const customers = getCustomers().filter((c) => c.id !== id);
+  const debts = getDebts().filter((d) => d.customerId !== id);
+  const payments = getPayments().filter((p) => p.customerId !== id);
+  saveCustomers(customers);
+  saveDebts(debts);
+  savePayments(payments);
+}
+
+export function deleteTransaction(txId: string): void {
+  const db = getDatabase();
+  db.transactions = db.transactions.filter(tx => tx.id !== txId);
+  saveDatabase(db);
+}
+
 export function getCustomerBalances(state: DatabaseState): CustomerBalance[] {
-  const todayStr = '2026-06-03'; // Hardcoded stable date matching CURRENT METADATA for accuracy
+  const todayStr = new Date().toISOString().split('T')[0];
   
   return state.customers.map(customer => {
     const custTxs = state.transactions.filter(tx => tx.customerId === customer.id);
@@ -196,9 +191,7 @@ export function getCustomerBalances(state: DatabaseState): CustomerBalance[] {
     custTxs.forEach(tx => {
       if (tx.type === 'debt') {
         totalDebt += tx.amount;
-        // Check if this specific pending debt is overdue
         if (tx.dueDate && tx.dueDate < todayStr) {
-          // Verify if this debt is not fully covered by payments
           isOverdue = true;
         }
       } else {
@@ -210,8 +203,6 @@ export function getCustomerBalances(state: DatabaseState): CustomerBalance[] {
     });
 
     const remainingDebt = Math.max(0, totalDebt - totalPaid);
-    
-    // An overdue state only matters if remaining debt is greater than zero
     const hasRemaining = remainingDebt > 0;
 
     return {
@@ -223,15 +214,6 @@ export function getCustomerBalances(state: DatabaseState): CustomerBalance[] {
       isOverdue: hasRemaining && isOverdue,
     };
   });
-}
-
-// Global Financial Summary
-export interface FinancialSummary {
-  grandTotalDebt: number;
-  grandTotalPaid: number;
-  grandTotalRemaining: number;
-  overdueCount: number;
-  activeCustomersCount: number;
 }
 
 export function computeFinancialSummary(state: DatabaseState): FinancialSummary {
@@ -261,91 +243,4 @@ export function computeFinancialSummary(state: DatabaseState): FinancialSummary 
     overdueCount,
     activeCustomersCount,
   };
-}
-
-// Add Customer
-export function addCustomer(name: string, phone: string, email?: string, notes?: string, region?: string): Customer {
-  const db = getDatabase();
-  const newCust: Customer = {
-    id: 'cust-' + Date.now(),
-    name: name.trim(),
-    phone: phone.trim(),
-    email: email?.trim() || undefined,
-    notes: notes?.trim() || undefined,
-    region: region?.trim() || undefined,
-    createdAt: new Date().toISOString(),
-  };
-  db.customers.push(newCust);
-  saveDatabase(db);
-  return newCust;
-}
-
-// Edit Customer
-export function updateCustomer(id: string, name: string, phone: string, email?: string, notes?: string, region?: string): Customer {
-  const db = getDatabase();
-  const idx = db.customers.findIndex(c => c.id === id);
-  if (idx === -1) {
-    throw new Error('Customer not found');
-  }
-  db.customers[idx] = {
-    ...db.customers[idx],
-    name: name.trim(),
-    phone: phone.trim(),
-    email: email?.trim() || undefined,
-    notes: notes?.trim() || undefined,
-    region: region?.trim() || undefined,
-  };
-  saveDatabase(db);
-  return db.customers[idx];
-}
-
-// Delete Customer & their transactions
-export function deleteCustomer(id: string): void {
-  const db = getDatabase();
-  db.customers = db.customers.filter(c => c.id !== id);
-  db.transactions = db.transactions.filter(tx => tx.customerId !== id);
-  saveDatabase(db);
-}
-
-// Add Transaction (Debt or Payment)
-export function addTransaction(customerId: string, type: TransactionType, amount: number, notes?: string, dueDate?: string): Transaction {
-  const db = getDatabase();
-  const newTx: Transaction = {
-    id: 'tx-' + Date.now(),
-    customerId,
-    type,
-    amount,
-    date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
-    dueDate: type === 'debt' ? dueDate : undefined,
-    notes: notes?.trim() || undefined,
-  };
-  db.transactions.push(newTx);
-  saveDatabase(db);
-  return newTx;
-}
-
-// Delete Transaction
-export function deleteTransaction(txId: string): void {
-  const db = getDatabase();
-  db.transactions = db.transactions.filter(tx => tx.id !== txId);
-  saveDatabase(db);
-}
-
-// Restore whole database
-export function importDatabase(jsonString: string): boolean {
-  try {
-    const parsed = JSON.parse(jsonString) as DatabaseState;
-    if (parsed && Array.isArray(parsed.customers) && Array.isArray(parsed.transactions)) {
-      saveDatabase({
-        version: parsed.version || 1,
-        customers: parsed.customers,
-        transactions: parsed.transactions,
-      });
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error('Failed to import database:', error);
-    return false;
-  }
 }

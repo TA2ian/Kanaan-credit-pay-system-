@@ -5,7 +5,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { DatabaseState, getCustomerBalances, CustomerBalance } from '../lib/db';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, formatPhoneNumberForUrl } from '../lib/utils';
 import { 
   Send, 
   MessageSquare, 
@@ -26,6 +26,7 @@ interface RemindersTabProps {
 
 export function RemindersTab({ db }: RemindersTabProps) {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [tone, setTone] = useState<'friendly' | 'firm' | 'formal' | 'urgent'>('friendly');
   const [customNotes, setCustomNotes] = useState<string>('');
   
@@ -75,7 +76,8 @@ export function RemindersTab({ db }: RemindersTabProps) {
     ];
   }, [selectedDebtorBalance]);
 
-  const handleApplyTemplate = (text: string) => {
+  const handleApplyTemplate = (templateId: string, text: string) => {
+    setSelectedTemplateId(templateId);
     setGeneratedMessage(text);
     setGeneratedAdvice('تم استدعاء قالب للتذكير السريع والسهل.');
   };
@@ -131,24 +133,9 @@ export function RemindersTab({ db }: RemindersTabProps) {
   const handleSendWhatsApp = () => {
     if (!selectedDebtorBalance || !generatedMessage) return;
     
-    // Clean phone number: remove all non-numeric characters (such as +, spaces, hyphens)
-    let cleanPhone = selectedDebtorBalance.customer.phone.trim().replace(/[^\d]/g, '');
+    // Clean and format phone number via shared utility
+    const cleanPhone = formatPhoneNumberForUrl(selectedDebtorBalance.customer.phone);
     
-    // Remove leading double zeros that might represent an international call prefix (e.g., 00963)
-    if (cleanPhone.startsWith('00')) {
-      cleanPhone = cleanPhone.substring(2);
-    }
-    
-    // Syria-specific phone number formatting (+963)
-    // 1. If it starts with 09 (Syrian local mobile format, e.g., 0958280936) and is 10 digits long:
-    if (cleanPhone.startsWith('09') && cleanPhone.length === 10) {
-      cleanPhone = '963' + cleanPhone.substring(1);
-    } 
-    // 2. If it is 9 digits and starts with 9 (e.g., 958280936), prepend the Syrian country code directly:
-    else if (cleanPhone.startsWith('9') && cleanPhone.length === 9) {
-      cleanPhone = '963' + cleanPhone;
-    }
-
     const encodedText = encodeURIComponent(generatedMessage);
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedText}`;
     
@@ -180,6 +167,7 @@ export function RemindersTab({ db }: RemindersTabProps) {
                   value={selectedCustomerId}
                   onChange={(e) => {
                     setSelectedCustomerId(e.target.value);
+                    setSelectedTemplateId(null);
                     setGeneratedMessage('');
                     setGeneratedAdvice('');
                   }}
@@ -215,8 +203,12 @@ export function RemindersTab({ db }: RemindersTabProps) {
                   {templates.map((t) => (
                     <button
                       key={t.id}
-                      onClick={() => handleApplyTemplate(t.text)}
-                      className="text-right text-xs bg-slate-50 hover:bg-slate-100 hover:text-indigo-700 p-2.5 rounded-xl border border-slate-150 transition-colors cursor-pointer font-medium"
+                      onClick={() => handleApplyTemplate(t.id, t.text)}
+                      className={`text-right text-xs p-2.5 rounded-xl border transition-colors cursor-pointer font-medium ${
+                        selectedTemplateId === t.id
+                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm'
+                          : 'bg-slate-50 hover:bg-slate-100 hover:text-indigo-700 border-slate-150'
+                      }`}
                     >
                       📎 {t.name}
                     </button>

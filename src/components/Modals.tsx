@@ -130,10 +130,10 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
           </div>
 
           <div>
-            <label className="block mb-1.5 text-xs font-bold text-slate-700">المنطقة / المدينة (مثال: الرياض، جدة، الشرقية، عسير)</label>
+            <label className="block mb-1.5 text-xs font-bold text-slate-700">المنطقة / الحي (مثال: الحاضر، القصور، الجراجمة، طريق حلب، الشريعة)</label>
             <input
               type="text"
-              placeholder="مثال: الرياض"
+              placeholder="مثال: الحاضر، القصور..."
               value={region}
               onChange={(e) => setRegion(e.target.value)}
               className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
@@ -174,19 +174,22 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
 
 // 2. ADD TRANSACTION MODAL (Debt or Payment)
 interface TransactionModalProps extends ModalProps {
-  customerId: string;
-  customerName: string;
+  customers?: Customer[]; // Optional list for selection
+  customerId?: string; // Optional if selecting from list
+  customerName?: string;
   type: TransactionType; // 'debt' (قيد دين) or 'payment' (قيد دفعة مستلمة)
   onSave: (customerId: string, type: TransactionType, amount: number, notes?: string, dueDate?: string) => void;
 }
 
-export function TransactionModal({ isOpen, onClose, customerId, customerName, type, onSave }: TransactionModalProps) {
+export function TransactionModal({ isOpen, onClose, customers, customerId, customerName, type, onSave }: TransactionModalProps) {
+  const [selectedCustomerId, setSelectedCustomerId] = useState(customerId || '');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [error, setError] = useState('');
 
   React.useEffect(() => {
+    setSelectedCustomerId(customerId || '');
     setAmount('');
     setNotes('');
     
@@ -195,7 +198,7 @@ export function TransactionModal({ isOpen, onClose, customerId, customerName, ty
     defaultDate.setDate(defaultDate.getDate() + 15);
     setDueDate(defaultDate.toISOString().split('T')[0]);
     setError('');
-  }, [isOpen, customerId, type]);
+  }, [isOpen, customerId, type, customers]);
 
   if (!isOpen) return null;
 
@@ -203,14 +206,22 @@ export function TransactionModal({ isOpen, onClose, customerId, customerName, ty
     e.preventDefault();
     const parsedAmount = parseFloat(amount);
     
+    if (!selectedCustomerId) {
+        setError('يرجى اختيار عميل.');
+        return;
+    }
+    
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       setError('يرجى إدخال مبلغ مالي صحيح أكبر من الصفر.');
       return;
     }
 
-    onSave(customerId, type, parsedAmount, notes, type === 'debt' ? dueDate : undefined);
+    onSave(selectedCustomerId, type, parsedAmount, notes, type === 'debt' ? dueDate : undefined);
     onClose();
   };
+  
+  const selectedCustomer = customers?.find(c => c.id === selectedCustomerId);
+  const nameToDisplay = selectedCustomer ? selectedCustomer.name : (customerName || 'اختر عميل...');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
@@ -245,7 +256,18 @@ export function TransactionModal({ isOpen, onClose, customerId, customerName, ty
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
             <span className="text-xs text-slate-500 block">لصالح العميل:</span>
-            <span className="text-base font-bold text-slate-800">{customerName}</span>
+            {customers ? (
+                <select 
+                    value={selectedCustomerId}
+                    onChange={(e) => setSelectedCustomerId(e.target.value)}
+                    className="w-full text-base font-bold text-slate-800 bg-transparent border-none focus:ring-0 p-0"
+                >
+                    <option value="">اختر عميلاً من القائمة...</option>
+                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+            ) : (
+                <span className="text-base font-bold text-slate-800">{nameToDisplay}</span>
+            )}
           </div>
 
           {error && (

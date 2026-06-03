@@ -129,7 +129,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           phone: d.phone || '',
           email: d.email || undefined,
           notes: d.notes || undefined,
-          region: d.region || undefined,
+          totalDebt: d.totalDebt || 0,
+          region: d.region || 'غير محدد',
           createdAt: d.createdAt || new Date().toISOString()
         });
       });
