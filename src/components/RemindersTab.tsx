@@ -1,0 +1,409 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useMemo } from 'react';
+import { DatabaseState, getCustomerBalances, CustomerBalance } from '../lib/db';
+import { formatCurrency } from '../lib/utils';
+import { 
+  Send, 
+  MessageSquare, 
+  Sparkles, 
+  Copy, 
+  Check, 
+  AlertCircle,
+  HelpCircle,
+  Clock,
+  User,
+  ExternalLink,
+  RefreshCw
+} from 'lucide-react';
+
+interface RemindersTabProps {
+  db: DatabaseState;
+}
+
+export function RemindersTab({ db }: RemindersTabProps) {
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [tone, setTone] = useState<'friendly' | 'firm' | 'formal' | 'urgent'>('friendly');
+  const [customNotes, setCustomNotes] = useState<string>('');
+  
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedMessage, setGeneratedMessage] = useState('');
+  const [generatedAdvice, setGeneratedAdvice] = useState('');
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const activeDebtors = useMemo(() => {
+    return getCustomerBalances(db).filter(b => b.remainingDebt > 0);
+  }, [db]);
+
+  // Set the first active debtor as default selection if any exists
+  React.useEffect(() => {
+    if (activeDebtors.length > 0 && !selectedCustomerId) {
+      setSelectedCustomerId(activeDebtors[0].customer.id);
+    }
+  }, [activeDebtors, selectedCustomerId]);
+
+  const selectedDebtorBalance = useMemo(() => {
+    return activeDebtors.find(d => d.customer.id === selectedCustomerId) || null;
+  }, [activeDebtors, selectedCustomerId]);
+
+  // 1. Predefined standard templates (قوالب سريعة جاهزة بدون ذكاء اصطناعي)
+  const templates = useMemo(() => {
+    if (!selectedDebtorBalance) return [];
+    const name = selectedDebtorBalance.customer.name;
+    const amountStr = formatCurrency(selectedDebtorBalance.remainingDebt);
+    
+    return [
+      {
+        id: 'tmpl-1',
+        name: 'تذكير ودي سريع',
+        text: `السلام عليكم ورحمة الله وبركاته أخ ${name}، أتمنى أن تكون بصحة وعافية. تذكير لطيف وسريع بأن رصيد حسابك المتبقي المعتمد لدينا يبلغ ${amountStr}. يرجى مراجعته وتسديده عند تيسر الأمر لكم. شكراً جزيلاً لتعاملك الطيب وثقتك الغالية.`,
+      },
+      {
+        id: 'tmpl-2',
+        name: 'طلب إلحاقي محدد',
+        text: `السلام عليكم أخي الفاضل ${name}، بخصوص المعاملات الأخيرة المتفق عليها لدينا، رصدنا متبقياً مالياً قدره ${amountStr} مستحق الدفع للتسوية. نتمنى تجهيز المبلغ أو تفضلكم بزيارتنا في أقرب فرصة لإغلاق الدفتر المالي الحالي. شاكرين ومقدرين حسن تعاونكم المعتاد.`,
+      },
+      {
+        id: 'tmpl-3',
+        name: 'جدولة استحقاق عاجل',
+        text: `السلام عليكم ورحمة الله وبركاته، الأخ الكريم ${name}. يرجى التكرم بالعلم بأن مبلغ ${amountStr} المسجل بذمتكم قد تجاوز وقت السير المعتاد. نرجو التواصل لتأكيد تجهيز الدفعة أو جدولة موعد زيارة نهائي ليتسنى لمندوبنا عبدالرحمن كنعان إغلاق القيود المحاسبية. جزاكم الله خيراً.`,
+      }
+    ];
+  }, [selectedDebtorBalance]);
+
+  const handleApplyTemplate = (text: string) => {
+    setGeneratedMessage(text);
+    setGeneratedAdvice('تم استدعاء قالب للتذكير السريع والسهل.');
+  };
+
+  // 2. Generate with Gemini AI
+  const handleGenerateAI = async () => {
+    if (!selectedDebtorBalance) {
+      setError('يرجى اختيار عميل لديه رصيد مستحق أولاً.');
+      return;
+    }
+
+    setIsGenerating(true);
+    setError('');
+    setGeneratedMessage('');
+    setGeneratedAdvice('');
+
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerName: selectedDebtorBalance.customer.name,
+          amount: selectedDebtorBalance.remainingDebt,
+          notes: customNotes || selectedDebtorBalance.customer.notes || 'مشتريات بضاعة متنوعة بالآجل',
+          tone: tone,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'حدث خطأ غير متوقع أثناء معالجة الـ AI.');
+      }
+
+      setGeneratedMessage(data.message);
+      setGeneratedAdvice(data.advice || 'راقب التزام العميل بالسداد في المواعيد المقررة.');
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || 'فشل الاتصال بالخادم الذكي لتوليد الرسالة.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCopyToClipboard = () => {
+    if (!generatedMessage) return;
+    navigator.clipboard.writeText(generatedMessage);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSendWhatsApp = () => {
+    if (!selectedDebtorBalance || !generatedMessage) return;
+    
+    // Clean phone number: remove all non-numeric characters (such as +, spaces, hyphens)
+    let cleanPhone = selectedDebtorBalance.customer.phone.trim().replace(/[^\d]/g, '');
+    
+    // Remove leading double zeros that might represent an international call prefix (e.g., 00963)
+    if (cleanPhone.startsWith('00')) {
+      cleanPhone = cleanPhone.substring(2);
+    }
+    
+    // Syria-specific phone number formatting (+963)
+    // 1. If it starts with 09 (Syrian local mobile format, e.g., 0958280936) and is 10 digits long:
+    if (cleanPhone.startsWith('09') && cleanPhone.length === 10) {
+      cleanPhone = '963' + cleanPhone.substring(1);
+    } 
+    // 2. If it is 9 digits and starts with 9 (e.g., 958280936), prepend the Syrian country code directly:
+    else if (cleanPhone.startsWith('9') && cleanPhone.length === 9) {
+      cleanPhone = '963' + cleanPhone;
+    }
+
+    const encodedText = encodeURIComponent(generatedMessage);
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedText}`;
+    
+    // Open in a new tab securely
+    window.open(whatsappUrl, '_blank', 'noreferrer,noopener');
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      {/* 1. LEFT CONFIG PANE */}
+      <div className="lg:col-span-1 space-y-4">
+        <div className="p-5 bg-white rounded-2xl border border-slate-100 shadow-xs space-y-4">
+          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+            <MessageSquare className="w-4.5 h-4.5 text-emerald-600" />
+            تجهيز تذكير المستحقات
+          </h3>
+
+          {activeDebtors.length === 0 ? (
+            <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-xl">
+              لا يوجد مدينين حالياً لإرسال مذكرات سداد إليهم! 👍
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Select Customer */}
+              <div>
+                <label className="block mb-1 text-xs font-bold text-slate-600">اختر العميل المطلوب:</label>
+                <select
+                  value={selectedCustomerId}
+                  onChange={(e) => {
+                    setSelectedCustomerId(e.target.value);
+                    setGeneratedMessage('');
+                    setGeneratedAdvice('');
+                  }}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors cursor-pointer"
+                >
+                  {activeDebtors.map((d) => (
+                    <option key={d.customer.id} value={d.customer.id}>
+                      {d.customer.name} (متبقي: {formatCurrency(d.remainingDebt)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedDebtorBalance && (
+                <div className="p-3 bg-rose-50/50 rounded-xl border border-rose-100/40 text-xs space-y-1">
+                  <div className="flex justify-between font-bold text-slate-700">
+                    <span>الرصيد المعلق السداد:</span>
+                    <span className="text-rose-600">{formatCurrency(selectedDebtorBalance.remainingDebt)}</span>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                    <span>آخر حركة للتفاعل:</span>
+                    <span>{selectedDebtorBalance.lastActive.split('T')[0]}</span>
+                  </div>
+                </div>
+              )}
+
+              <hr className="border-slate-100" />
+
+              {/* Quick Template Presets */}
+              <div className="space-y-2">
+                <span className="block text-[10px] font-bold text-slate-400">قوالب رسائل جاهزة سريعة:</span>
+                <div className="flex flex-col gap-1.5">
+                  {templates.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => handleApplyTemplate(t.text)}
+                      className="text-right text-xs bg-slate-50 hover:bg-slate-100 hover:text-indigo-700 p-2.5 rounded-xl border border-slate-150 transition-colors cursor-pointer font-medium"
+                    >
+                      📎 {t.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <hr className="border-slate-100" />
+
+              {/* Spark smart generation configuration */}
+              <div className="space-y-3.5 bg-indigo-50/15 p-4 rounded-xl border border-indigo-100/30">
+                <span className="block text-xs font-bold text-indigo-800 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-650" />
+                  محرك صياغة مذكرات AI الذكي
+                </span>
+
+                {/* Tone select */}
+                <div>
+                  <label className="block mb-1 text-[10px] font-bold text-slate-600">نبرة وأسلوب الصياغة:</label>
+                  <div className="grid grid-cols-2 gap-1 text-[10px] font-bold">
+                    <button
+                      onClick={() => setTone('friendly')}
+                      className={`py-1.5 rounded-lg border text-center cursor-pointer transition-all ${
+                        tone === 'friendly' 
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' 
+                          : 'bg-white text-slate-600 border-slate-200 hover:text-slate-800'
+                      }`}
+                    >
+                      😊 ودود ومعاتب
+                    </button>
+                    <button
+                      onClick={() => setTone('firm')}
+                      className={`py-1.5 rounded-lg border text-center cursor-pointer transition-all ${
+                        tone === 'firm' 
+                          ? 'bg-slate-700 text-white border-slate-700 shadow-xs' 
+                          : 'bg-white text-slate-600 border-slate-200 hover:text-slate-800'
+                      }`}
+                    >
+                      🛡️ حازم ومتزن
+                    </button>
+                    <button
+                      onClick={() => setTone('formal')}
+                      className={`py-1.5 rounded-lg border text-center cursor-pointer transition-all ${
+                        tone === 'formal' 
+                          ? 'bg-sky-700 text-white border-sky-700 shadow-xs' 
+                          : 'bg-white text-slate-600 border-slate-200 hover:text-slate-800'
+                      }`}
+                    >
+                      💼 تجاري رسمي
+                    </button>
+                    <button
+                      onClick={() => setTone('urgent')}
+                      className={`py-1.5 rounded-lg border text-center cursor-pointer transition-all ${
+                        tone === 'urgent' 
+                          ? 'bg-rose-700 text-white border-rose-700 shadow-xs' 
+                          : 'bg-white text-slate-600 border-slate-200 hover:text-slate-800'
+                      }`}
+                    >
+                      ⏳ عاجل جداً
+                    </button>
+                  </div>
+                </div>
+
+                {/* Custom Notes */}
+                <div>
+                  <label className="block mb-1 text-[10px] font-bold text-slate-600">ملاحظات إضافية يدمجها الذكاء الاصطناعي (اختياري)</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: خصم ٢٠٠ رس إذا دفع هذا الأسبوع"
+                    value={customNotes}
+                    onChange={(e) => setCustomNotes(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-hidden focus:border-indigo-500"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateAI}
+                  disabled={isGenerating || !selectedCustomerId}
+                  className="w-full py-2 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-indigo-800 hover:opacity-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {isGenerating ? 'جاري صياغة النص بـ AI...' : 'صياغة التنبيه بالذكاء الاصطناعي'}
+                </button>
+              </div>
+
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 2. RIGHT PREVIEW BOARD */}
+      <div className="lg:col-span-2 space-y-4">
+        <div className="p-6 bg-white rounded-2xl border border-slate-100 shadow-xs space-y-5 flex flex-col justify-between min-h-[460px]">
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h4 className="text-sm font-bold text-slate-800">معاينة الرسالة المتولدة والإرسال</h4>
+              <span className="text-[10px] text-slate-400 font-bold">تطبيق واتساب</span>
+            </div>
+
+            {error && (
+              <div className="p-3 bg-red-50 text-red-600 border border-red-150 rounded-xl text-xs font-bold">
+                {error}
+              </div>
+            )}
+
+            {/* Simulated Mobile WhatsApp Chat Node */}
+            <div className="bg-slate-50 rounded-2xl p-4 md:p-6 border border-slate-150 max-w-lg mx-auto relative overflow-hidden">
+              <div className="absolute inset-0 bg-repeat opacity-[0.03]" style={{ backgroundImage: "url('https://upload.wikimedia.org/wikipedia/commons/e/e3/WhatsApp_background.png')" }} />
+              
+              <div className="relative z-10 space-y-4">
+                {/* Contact header simulation */}
+                <div className="flex items-center gap-2.5 pb-2 border-b border-slate-200/50">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-slate-800">{selectedDebtorBalance ? selectedDebtorBalance.customer.name : 'اسم العميل'}</h5>
+                    <span className="text-[9px] text-slate-400 font-bold tracking-wider" dir="ltr">{selectedDebtorBalance ? selectedDebtorBalance.customer.phone : '050xxxxxxx'}</span>
+                  </div>
+                </div>
+
+                {/* Message display bubble inside simulated phone */}
+                <div className="flex items-end justify-start">
+                  {!generatedMessage ? (
+                    <div className="bg-white p-5 rounded-2xl rounded-tr-none text-slate-400 text-xs text-center border border-slate-100 max-w-sm">
+                      <p>لم يتم صياغة أي تذكير بعد.</p>
+                      <p className="text-[10px] mt-1 text-slate-500">اختر قالباً سريعاً من اليمين أو صغ نص مالي متقن ومحدد بالذكاء الاصطناعي (Gemini) بضغطة زر واحدة.</p>
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-50 text-slate-800 px-4 py-3.5 rounded-2xl rounded-tr-none shadow-2xs text-xs font-semibold whitespace-pre-line leading-relaxed max-w-sm border border-emerald-150/50">
+                      {generatedMessage}
+                      <span className="block text-left text-[9px] text-slate-400 font-sans mt-2.5" dir="ltr">
+                        {new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Smart Gemini financial recommendation column */}
+            {generatedAdvice && (
+              <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100/30 text-xs text-indigo-900 space-y-1">
+                <span className="font-bold text-[10px] text-indigo-700 uppercase tracking-wide flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  رأي وتوصية مساعد الذكاء المالي للتعامل مع هذا العميل:
+                </span>
+                <p className="italic">{generatedAdvice}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Action Row */}
+          <div className="flex items-center gap-3 border-t border-slate-100 pt-4">
+            <button
+              onClick={handleSendWhatsApp}
+              disabled={!generatedMessage}
+              className="flex-1 py-3 px-4 font-bold text-xs text-white bg-emerald-650 hover:bg-emerald-700 rounded-xl tracking-wide shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Send className="w-4.5 h-4.5" />
+              إرسال مباشر للواتساب
+              <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-80" />
+            </button>
+            <button
+              onClick={handleCopyToClipboard}
+              disabled={!generatedMessage}
+              className="px-4 py-3 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  تم النسخ!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  نسخ النص
+                </>
+              )}
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  );
+}

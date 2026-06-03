@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "Customer": {
+      "title": "Customer",
+      "description": "Merchant customer record for debt tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string", "description": "Authenticated merchant user ID" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "name", "phone", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Debt or payment transaction record linked to a customer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string", "description": "Authenticated merchant user ID" },
+        "customerId": { "type": "string" },
+        "type": { "type": "string", "enum": ["debt", "payment"] },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "description": "Transaction date formatted as YYYY-MM-DD" },
+        "dueDate": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "ownerId", "customerId", "type", "amount", "date"]
+    }
+  },
+  "firestore": {
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "The collection of merchant customers"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "The collection of debts and payments"
+    }
+  }
+}

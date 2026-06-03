@@ -1,0 +1,6 @@
+{
+  "name": "دفتر الديون الذكي",
+  "description": "نظام لإدارة ديون وحسابات العملاء المترتبة، إدارة الدفعات، الفلترة الذكية، إرسال تذكيرات واتساب، وتحليلات مسبقة ومبسطة بالذكاء الاصطناعي.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
