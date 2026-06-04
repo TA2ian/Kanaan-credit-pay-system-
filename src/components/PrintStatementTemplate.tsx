@@ -14,7 +14,15 @@ interface PrintStatementTemplateProps {
 export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ balance, transactions, reminder }) => {
   const { customer, totalDebt, totalPaid, remainingDebt } = balance;
   const [viewMode, setViewMode] = useState<'a4' | 'thermal'>('a4');
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const savedLogo = localStorage.getItem('company_logo');
+    if (savedLogo) {
+      setLogoBase64(savedLogo);
+    }
+  }, []);
 
   const handlePrint = () => {
     window.print();
@@ -73,9 +81,10 @@ export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ 
   };
 
   return (
-    <div className={viewMode === 'thermal' ? 'p-2 w-[80mm] mx-auto text-xs bg-white text-right' : 'p-8 max-w-[800px] mx-auto bg-slate-50 text-right font-sans rounded-2xl'} dir="rtl">
-      {/* Controls */}
-      <div className="flex flex-wrap gap-2 mb-8 print:hidden justify-center bg-white border border-slate-200 p-3 rounded-xl shadow-xs">
+    <div className="w-full overflow-x-auto bg-slate-100/50 p-2 sm:p-4 rounded-xl">
+      <div className={viewMode === 'thermal' ? 'p-1 w-[58mm] min-w-[58mm] mx-auto text-[10px] bg-white text-right shadow-sm' : 'p-4 sm:p-8 w-full max-w-[650px] min-w-[320px] mx-auto bg-slate-50 text-right font-sans rounded-2xl shadow-sm'} dir="rtl">
+        {/* Controls */}
+        <div className="flex flex-wrap gap-2 mb-8 print:hidden justify-center bg-white border border-slate-200 p-3 rounded-xl shadow-xs sticky left-0 right-0">
         <button onClick={() => setViewMode(viewMode === 'a4' ? 'thermal' : 'a4')} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm">
           {viewMode === 'a4' ? <Receipt className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
           {viewMode === 'a4' ? 'نص حراري' : 'A4 عرض'}
@@ -94,95 +103,99 @@ export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ 
         </button>
       </div>
 
-      <div ref={contentRef} className="p-6 sm:p-8 rounded-xl shadow-sm" dir="rtl" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderWidth: 1 }}>
+      <div ref={contentRef} className={`${viewMode === 'thermal' ? 'p-2' : 'p-4 sm:p-6'} rounded-xl shadow-sm`} dir="rtl" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderWidth: 1 }}>
         {/* Header */}
-      <div className="flex justify-between items-center mb-6 w-full">
-        <div className="text-right">
-          <h1 className="text-2xl font-black mb-1 leading-tight" style={{ color: '#1e40af' }}>كنعان</h1>
-          <p className="text-sm font-bold mb-1" style={{ color: '#f97316' }}>مندوب مواد غذائية ومشروبات</p>
-          <p className="text-sm" dir="ltr" style={{ textAlign: "right", color: '#1e293b' }}>0958280936</p>
+      <div className={`flex ${viewMode === 'thermal' ? 'flex-col text-center gap-4' : 'justify-between items-center'} mb-6 w-full`}>
+        <div className={viewMode === 'thermal' ? 'text-center' : 'text-right'}>
+          <h1 className={`${viewMode === 'thermal' ? 'text-xl' : 'text-2xl'} font-black mb-1 leading-tight`} style={{ color: '#1e40af' }}>كنعان</h1>
+          <p className={`${viewMode === 'thermal' ? 'text-xs' : 'text-sm'} font-bold mb-1`} style={{ color: '#f97316' }}>مندوب مواد غذائية ومشروبات</p>
+          <p className={`${viewMode === 'thermal' ? 'text-xs' : 'text-sm'}`} dir="ltr" style={{ textAlign: viewMode === 'thermal' ? "center" : "right", color: '#1e293b' }}>0958280936</p>
         </div>
         <div className="text-center flex-1">
-          <h2 className="text-3xl font-black mb-2" style={{ color: '#1e40af' }}>كشف حساب</h2>
-          <h3 className="text-xl font-bold mb-1" style={{ color: '#0f172a' }}>{customer.name}</h3>
-          <p className="text-sm" style={{ color: '#64748b' }}>{new Date().toLocaleDateString('ar-SA')}</p>
+          <h2 className={`${viewMode === 'thermal' ? 'text-xl' : 'text-3xl'} font-black mb-2`} style={{ color: '#1e40af' }}>كشف حساب</h2>
+          <h3 className={`${viewMode === 'thermal' ? 'text-lg' : 'text-xl'} font-bold mb-1`} style={{ color: '#0f172a' }}>{customer.name}</h3>
+          <p className={`${viewMode === 'thermal' ? 'text-[10px]' : 'text-sm'}`} style={{ color: '#64748b' }}>{new Date().toLocaleDateString('ar-SA')}</p>
         </div>
-        <div className="w-32 flex justify-end shrink-0">
-          <div className="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center shadow-sm" style={{ border: '4px solid #D4AF37', backgroundColor: '#ffffff' }}>
-             <img src="/logo.jpg" alt="شعار كنعان" className="w-full h-full object-cover" crossOrigin="anonymous" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+        <div className={`flex justify-center shrink-0 ${viewMode === 'thermal' ? 'w-full' : 'w-32 justify-end'}`}>
+          <div className={`${viewMode === 'thermal' ? 'w-16 h-16' : 'w-24 h-24'} rounded-full overflow-hidden flex items-center justify-center shadow-sm`} style={{ border: '4px solid #D4AF37', backgroundColor: '#ffffff' }}>
+             {logoBase64 ? (
+               <img src={logoBase64} alt="شعار كنعان" className="w-full h-full object-cover" />
+             ) : (
+               <span className="text-xs font-bold px-2 text-center" style={{ color: 'rgba(30, 64, 175, 0.2)' }}>شعار</span>
+             )}
           </div>
         </div>
       </div>
       <div className="border-b-4 mb-8 w-full" style={{ borderColor: '#1e40af' }}></div>
 
       {/* Summary Cards */}
-      <div className="flex gap-4 mb-8 justify-between w-full">
-        <div className="flex-1 p-4 rounded-xl shadow-sm flex flex-col justify-center min-h-[100px]" style={{ backgroundColor: '#ffffff', borderColor: '#fda4af', borderWidth: 1 }}>
-          <p className="text-sm font-bold mb-3 flex items-center justify-center gap-2" style={{ color: '#64748b' }}>الرصيد المستحق</p>
-          <p className="text-2xl font-black text-center" style={{ color: '#e11d48' }}>{formatCurrency(remainingDebt)}</p>
-          <p className="text-center text-xs font-bold mt-2" style={{ color: '#475569' }}>⏳ مستحق</p>
+      <div className={`flex ${viewMode === 'thermal' ? 'flex-col gap-2' : 'gap-4'} mb-8 justify-between w-full`}>
+        <div className={`flex-1 p-3 rounded-xl shadow-sm flex flex-col justify-center min-h-[80px]`} style={{ backgroundColor: '#ffffff', borderColor: '#fda4af', borderWidth: 1 }}>
+          <p className={`${viewMode === 'thermal' ? 'text-[10px]' : 'text-sm'} font-bold mb-2 flex items-center justify-center gap-2`} style={{ color: '#64748b' }}>الرصيد المستحق</p>
+          <p className={`${viewMode === 'thermal' ? 'text-lg' : 'text-2xl'} font-black text-center`} style={{ color: '#e11d48' }}>{formatCurrency(remainingDebt)}</p>
+          <p className={`text-center ${viewMode === 'thermal' ? 'text-[9px]' : 'text-xs'} font-bold mt-1`} style={{ color: '#475569' }}>⏳ مستحق</p>
         </div>
-        <div className="flex-1 p-4 rounded-xl shadow-sm flex flex-col justify-center min-h-[100px]" style={{ backgroundColor: '#ffffff', borderColor: '#6ee7b7', borderWidth: 1 }}>
-          <p className="text-sm font-bold mb-3 text-center" style={{ color: '#64748b' }}>إجمالي المسدّد</p>
-          <p className="text-2xl font-black text-center" style={{ color: '#059669' }}>{formatCurrency(totalPaid)}</p>
-          <p className="text-center text-xs font-bold mt-2" style={{ color: '#64748b' }}>{transactions.filter(t => t.type === 'payment').length} دفعة</p>
+        <div className={`flex-1 p-3 rounded-xl shadow-sm flex flex-col justify-center min-h-[80px]`} style={{ backgroundColor: '#ffffff', borderColor: '#6ee7b7', borderWidth: 1 }}>
+          <p className={`${viewMode === 'thermal' ? 'text-[10px]' : 'text-sm'} font-bold mb-2 text-center`} style={{ color: '#64748b' }}>إجمالي المسدّد</p>
+          <p className={`${viewMode === 'thermal' ? 'text-lg' : 'text-2xl'} font-black text-center`} style={{ color: '#059669' }}>{formatCurrency(totalPaid)}</p>
+          <p className={`text-center ${viewMode === 'thermal' ? 'text-[9px]' : 'text-xs'} font-bold mt-1`} style={{ color: '#64748b' }}>{transactions.filter(t => t.type === 'payment').length} دفعة</p>
         </div>
-        <div className="flex-1 p-4 rounded-xl shadow-sm flex flex-col justify-center min-h-[100px]" style={{ backgroundColor: '#ffffff', borderColor: '#bfdbfe', borderWidth: 1 }}>
-          <p className="text-sm font-bold mb-3 text-center" style={{ color: '#64748b' }}>إجمالي البضاعة</p>
-          <p className="text-2xl font-black text-center" style={{ color: '#1e40af' }}>{formatCurrency(totalDebt)}</p>
-          <p className="text-center text-xs font-bold mt-2" style={{ color: '#64748b' }}>{transactions.filter(t => t.type === 'debt').length} تسليم</p>
+        <div className={`flex-1 p-3 rounded-xl shadow-sm flex flex-col justify-center min-h-[80px]`} style={{ backgroundColor: '#ffffff', borderColor: '#bfdbfe', borderWidth: 1 }}>
+          <p className={`${viewMode === 'thermal' ? 'text-[10px]' : 'text-sm'} font-bold mb-2 text-center`} style={{ color: '#64748b' }}>إجمالي البضاعة</p>
+          <p className={`${viewMode === 'thermal' ? 'text-lg' : 'text-2xl'} font-black text-center`} style={{ color: '#1e40af' }}>{formatCurrency(totalDebt)}</p>
+          <p className={`text-center ${viewMode === 'thermal' ? 'text-[9px]' : 'text-xs'} font-bold mt-1`} style={{ color: '#64748b' }}>{transactions.filter(t => t.type === 'debt').length} تسليم</p>
         </div>
       </div>
 
       {/* Transactions */}
-      <div className="space-y-8 mb-8">
+      <div className={`space-y-${viewMode === 'thermal' ? '4' : '8'} mb-8`}>
         <section>
-          <h3 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: '#1e40af' }}>🚚 التسليمات</h3>
-          <table className="w-full text-right border-collapse">
+          <h3 className={`${viewMode === 'thermal' ? 'text-xs' : 'text-lg'} font-bold mb-2 flex items-center gap-2`} style={{ color: '#1e40af' }}>🚚 التسليمات</h3>
+          <table className={`w-full text-right ${viewMode === 'thermal' ? 'text-[9px]' : ''} border-collapse`}>
             <thead>
               <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
-                <th className="py-2 font-bold w-1/3" style={{ color: '#1e40af' }}>التاريخ</th>
-                <th className="py-2 font-bold w-1/3 text-center" style={{ color: '#1e40af' }}>البيان</th>
-                <th className="py-2 font-bold w-1/3 text-left" style={{ color: '#1e40af' }}>المبلغ</th>
+                <th className={`${viewMode === 'thermal' ? 'py-1' : 'py-2'} font-bold w-1/3`} style={{ color: '#1e40af' }}>التاريخ</th>
+                <th className={`${viewMode === 'thermal' ? 'py-1' : 'py-2'} font-bold w-1/3 text-center`} style={{ color: '#1e40af' }}>البيان</th>
+                <th className={`${viewMode === 'thermal' ? 'py-1' : 'py-2'} font-bold w-1/3 text-left`} style={{ color: '#1e40af' }}>المبلغ</th>
               </tr>
             </thead>
             <tbody>
               {transactions.filter(tx => tx.type === 'debt').map((tx, i) => (
                 <tr key={i} className="border-b" style={{ borderColor: '#f1f5f9' }}>
-                  <td className="py-3" style={{ color: '#475569' }}>{tx.date}</td>
-                  <td className="py-3 text-center" style={{ color: '#475569' }}>{tx.notes || '---'}</td>
-                  <td className="py-3 font-bold text-left" dir="ltr" style={{ color: '#1e40af' }}>{formatCurrency(tx.amount)}</td>
+                  <td className={`${viewMode === 'thermal' ? 'py-1' : 'py-3'}`} style={{ color: '#475569' }}>{tx.date}</td>
+                  <td className={`${viewMode === 'thermal' ? 'py-1' : 'py-3'} text-center`} style={{ color: '#475569' }}>{tx.notes || '---'}</td>
+                  <td className={`${viewMode === 'thermal' ? 'py-1' : 'py-3'} font-bold text-left`} dir="ltr" style={{ color: '#1e40af' }}>{formatCurrency(tx.amount)}</td>
                 </tr>
               ))}
               <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
-                <td colSpan={2} className="py-4 font-black text-center" style={{ color: '#1e40af' }}>المجموع</td>
-                <td className="py-4 font-black text-left" dir="ltr" style={{ color: '#1e40af' }}>{formatCurrency(totalDebt)}</td>
+                <td colSpan={2} className={`${viewMode === 'thermal' ? 'py-2' : 'py-4'} font-black text-center`} style={{ color: '#1e40af' }}>المجموع</td>
+                <td className={`${viewMode === 'thermal' ? 'py-2' : 'py-4'} font-black text-left`} dir="ltr" style={{ color: '#1e40af' }}>{formatCurrency(totalDebt)}</td>
               </tr>
             </tbody>
           </table>
         </section>
 
         <section>
-          <h3 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: '#059669' }}>💵 الدفعات</h3>
-          <table className="w-full text-right border-collapse">
+          <h3 className={`${viewMode === 'thermal' ? 'text-xs' : 'text-lg'} font-bold mb-2 flex items-center gap-2`} style={{ color: '#059669' }}>💵 الدفعات</h3>
+          <table className={`w-full text-right ${viewMode === 'thermal' ? 'text-[9px]' : ''} border-collapse`}>
             <thead>
               <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
-                <th className="py-2 font-bold w-1/3" style={{ color: '#059669' }}>التاريخ</th>
-                <th className="py-2 font-bold w-1/3 text-center" style={{ color: '#059669' }}>ملاحظة</th>
-                <th className="py-2 font-bold w-1/3 text-left" style={{ color: '#059669' }}>المبلغ</th>
+                <th className={`${viewMode === 'thermal' ? 'py-1' : 'py-2'} font-bold w-1/3`} style={{ color: '#059669' }}>التاريخ</th>
+                <th className={`${viewMode === 'thermal' ? 'py-1' : 'py-2'} font-bold w-1/3 text-center`} style={{ color: '#059669' }}>ملاحظة</th>
+                <th className={`${viewMode === 'thermal' ? 'py-1' : 'py-2'} font-bold w-1/3 text-left`} style={{ color: '#059669' }}>المبلغ</th>
               </tr>
             </thead>
             <tbody>
               {transactions.filter(tx => tx.type === 'payment').map((tx, i) => (
                 <tr key={i} className="border-b" style={{ borderColor: '#f1f5f9' }}>
-                  <td className="py-3" style={{ color: '#475569' }}>{tx.date}</td>
-                  <td className="py-3 text-center" style={{ color: '#475569' }}>{tx.notes || '---'}</td>
-                  <td className="py-3 font-bold text-left" dir="ltr" style={{ color: '#059669' }}>{formatCurrency(tx.amount)}</td>
+                  <td className={`${viewMode === 'thermal' ? 'py-1' : 'py-3'}`} style={{ color: '#475569' }}>{tx.date}</td>
+                  <td className={`${viewMode === 'thermal' ? 'py-1' : 'py-3'} text-center`} style={{ color: '#475569' }}>{tx.notes || '---'}</td>
+                  <td className={`${viewMode === 'thermal' ? 'py-1' : 'py-3'} font-bold text-left`} dir="ltr" style={{ color: '#059669' }}>{formatCurrency(tx.amount)}</td>
                 </tr>
               ))}
               <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
-                <td colSpan={2} className="py-4 font-black text-center" style={{ color: '#059669' }}>المجموع</td>
-                <td className="py-4 font-black text-left" dir="ltr" style={{ color: '#059669' }}>{formatCurrency(totalPaid)}</td>
+                <td colSpan={2} className={`${viewMode === 'thermal' ? 'py-2' : 'py-4'} font-black text-center`} style={{ color: '#059669' }}>المجموع</td>
+                <td className={`${viewMode === 'thermal' ? 'py-2' : 'py-4'} font-black text-left`} dir="ltr" style={{ color: '#059669' }}>{formatCurrency(totalPaid)}</td>
               </tr>
             </tbody>
           </table>
@@ -190,11 +203,11 @@ export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ 
       </div>
 
       {/* Final Balance Large Card */}
-      <div className="rounded-xl p-4 flex justify-between items-center mb-8" style={{ backgroundColor: '#fff1f2', borderColor: '#fda4af', borderWidth: 1 }}>
-        <div className="flex items-center gap-2 font-black text-xl" style={{ color: '#e11d48' }}>
+      <div className={`rounded-xl ${viewMode === 'thermal' ? 'p-2 flex-col gap-2 justify-center text-center' : 'p-4 flex justify-between items-center'} mb-8`} style={{ backgroundColor: '#fff1f2', borderColor: '#fda4af', borderWidth: 1 }}>
+        <div className={`flex items-center justify-center gap-2 font-black ${viewMode === 'thermal' ? 'text-[10px]' : 'text-xl'}`} style={{ color: '#e11d48' }}>
            <span>⏳ الرصيد المستحق</span>
         </div>
-        <div className="text-3xl font-black" dir="ltr" style={{ color: '#e11d48' }}>
+        <div className={`${viewMode === 'thermal' ? 'text-lg' : 'text-3xl'} font-black`} dir="ltr" style={{ color: '#e11d48' }}>
           {formatCurrency(remainingDebt)}
         </div>
       </div>
@@ -209,6 +222,7 @@ export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ 
       {/* Footer */}
       <div className="pt-4 border-t text-center text-xs" style={{ borderColor: '#e2e8f0', color: '#94a3b8' }}>
          كنعان — مندوب مواد غذائية ومشروبات • {new Date().toLocaleDateString('ar-SA')}
+      </div>
       </div>
       </div>
     </div>

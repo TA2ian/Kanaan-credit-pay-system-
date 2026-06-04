@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Customer, TransactionType } from '../lib/db';
-import { X, UserPlus, FileSpreadsheet, PlusCircle, Calendar, ShieldCheck, DollarSign } from 'lucide-react';
+import { X, UserPlus, FileSpreadsheet, PlusCircle, Calendar, ShieldCheck, DollarSign, Contact } from 'lucide-react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -65,6 +65,35 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
     onClose();
   };
 
+  const handlePickContact = async () => {
+    if (window.top !== window.self) {
+      setError('يرجى فتح التطبيق في علامة تبويب جديدة لاستخدام هذه الخاصية (بسبب قيود المتصفح).');
+      return;
+    }
+    
+    if ('contacts' in navigator && (window as any).ContactsManager) {
+      try {
+        const props = ['name', 'tel'];
+        const opts = { multiple: false };
+        const contacts = await (navigator as any).contacts.select(props, opts);
+        if (contacts && contacts.length > 0) {
+          const contact = contacts[0];
+          if (contact.name && contact.name.length > 0) setName(contact.name[0]);
+          if (contact.tel && contact.tel.length > 0) {
+            const cleanPhone = contact.tel[0].replace(/[^\d+]/g, '');
+            setPhone(cleanPhone);
+          }
+          setError('');
+        }
+      } catch (err: any) {
+        console.error(err);
+        setError(`لم نتمكن من استيراد جهات الاتصال: ${err.message || 'حدث خطأ'}`);
+      }
+    } else {
+      setError('خاصية استيراد جهات الاتصال غير مدعومة في هذا المتصفح/الجهاز (تعمل على هواتف أندرويد بشكل أساسي).');
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
       <div className="w-full max-w-md overflow-hidden bg-white rounded-2xl shadow-xl border border-slate-100 animate-slide-up">
@@ -89,6 +118,17 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
             <div className="p-3 text-xs font-semibold text-red-600 bg-red-50 rounded-xl border border-red-100">
               {error}
             </div>
+          )}
+
+          {('contacts' in navigator && (window as any).ContactsManager) && (
+            <button
+              type="button"
+              onClick={handlePickContact}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 rounded-xl text-sm font-bold transition-colors mb-2 cursor-pointer"
+            >
+              <Contact className="w-4 h-4" />
+              استيراد من جهات الاتصال
+            </button>
           )}
 
           <div>
