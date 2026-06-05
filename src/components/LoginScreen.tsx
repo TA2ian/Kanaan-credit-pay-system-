@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { useFirebase } from '../lib/FirebaseContext';
 import { BookOpen, LogIn, Sparkles, Chrome, Mail, Lock, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
+import { motion } from 'motion/react';
 
 export function LoginScreen() {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useFirebase();
@@ -66,7 +67,13 @@ export function LoginScreen() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4" dir="rtl">
-      <div className="w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden flex flex-col">
+      <motion.div 
+        initial={{ opacity: 0, y: 25, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", duration: 0.55, bounce: 0.12 }}
+        style={{ willChange: 'transform, opacity' }}
+        className="w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden flex flex-col"
+      >
         
         {/* Decorative Top Branding */}
         <div className="p-8 text-center bg-radial-at-t from-sky-900 to-slate-950 text-white relative border-b border-amber-500/20">
@@ -89,14 +96,14 @@ export function LoginScreen() {
           
           {/* Progress / Status Messages */}
           {error && (
-            <div className="p-3 bg-red-50 text-red-850 border border-red-200 rounded-xl text-xs font-bold flex items-center gap-2">
-              <AlertTriangle className="w-4.5 h-4.5 text-red-650 shrink-0" />
+            <div className="p-3 bg-red-50 text-red-800 border border-red-200 rounded-xl text-xs font-bold flex items-center gap-2">
+              <AlertTriangle className="w-4.5 h-4.5 text-red-600 shrink-0" />
               <p className="leading-relaxed">{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="p-3 bg-indigo-50 text-indigo-850 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-2">
+            <div className="p-3 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-2">
               <CheckCircle2 className="w-4.5 h-4.5 text-indigo-600 shrink-0" />
               <p className="leading-relaxed">{success}</p>
             </div>
@@ -164,6 +171,7 @@ export function LoginScreen() {
           {/* Toggle form button */}
           <div className="text-center pt-2">
             <button
+              type="button"
               onClick={() => {
                 setError('');
                 setIsSignUp(!isSignUp);
@@ -182,7 +190,7 @@ export function LoginScreen() {
           * يتم تشفير وإرسال كلمات المرور والحسابات بطبقة تشفير معيارية SSL كاملة مباشرة لخوادم Google Firebase دون تخزين وسيط.
         </div>
 
-      </div>
+      </motion.div>
     </div>
   );
 }

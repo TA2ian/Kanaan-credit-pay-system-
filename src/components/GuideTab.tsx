@@ -74,15 +74,30 @@ export function GuideTab() {
               <BellRing className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-800 mb-2">المساعد الذكي (AI) للتذكيرات</h3>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">المساعد الذكي (AI) والتذكيرات الذكية</h3>
               <p className="text-sm text-slate-500 leading-relaxed">
-                دعم مدمج بالذكاء الاصطناعي من Gemini لتحليل أرصدة الزبائن وتوليد رسائل تذكير مهذبة ومخصصة للمطالبة بالسداد. بضغطة زر، يمكنك إرسال الرسالة للعميل عبر الواتساب بدون الحاجة لكتابتها يدوياً.
+                دعم مدمج بالذكاء الاصطناعي من Gemini لتحليل أرصدة الزبائن وصياغة رسائل للمطالبة بالسداد. يمكنك الآن <strong>بكبسة زر واحدة</strong> من لوحة التحكم النقر على العميل المتأخر ليقوم النظام تلقائياً بفتح صفحة التذكير وتشغيل الذكاء الاصطناعي لصياغة الرسالة المناسبة وإرسالها عبر الواتساب فوراً.
               </p>
             </div>
           </div>
         </div>
 
         {/* Section 5 */}
+        <div className="bg-white p-6 rounded-2xl border border-blue-50/50 bg-blue-50/5 shadow-sm transition hover:shadow-md">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <LayoutDashboard className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">التصنيفات التفاعلية للعملاء</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                تم دمج ميزة التصفية التفاعلية؛ حيث يمكنك تتبع حسابات العملاء وتوزيعهم بين (مسددين، ملتزمين، متأخرين) في الواجهة الرئيسية. بالنقر على أي تصنيف، سيتم توجيهك فورياً لتبويب العملاء وتفعيل الفلتر المطابق لمتابعة تلك الفئة المعينة بشكل سلس وبسيط.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 6 */}
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm transition hover:shadow-md">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
@@ -97,7 +112,7 @@ export function GuideTab() {
           </div>
         </div>
 
-        {/* Section 6 */}
+        {/* Section 7 */}
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm transition hover:shadow-md">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">

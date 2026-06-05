@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   DatabaseState, 
   Customer, 
@@ -39,6 +40,8 @@ import {
 } from 'lucide-react';
 import { QuickActionFAB } from './QuickActionFAB';
 import { StatementPreviewModal } from './StatementPreviewModal';
+import { motion, AnimatePresence } from 'motion/react';
+
 
 interface CustomersTabProps {
   db: DatabaseState;
@@ -60,8 +63,9 @@ export function CustomersTab({
   onEditCustomerTrigger,
 }: CustomersTabProps) {
   const { user, deleteCustomerFromFS, deleteTransactionFromFS } = useFirebase();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'debtors' | 'settled'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'debtors' | 'settled' | 'overdue'>('all');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [sortType, setSortType] = useState<'default' | 'debt_desc' | 'oldest_debt'>('default');
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
@@ -82,6 +86,17 @@ export function CustomersTab({
       clearInitialSelection();
     }
   }, [selectedCustomerIdInitially]);
+
+  // Sync initial filter request from classification clicks
+  React.useEffect(() => {
+    const queryFilter = searchParams.get('filter');
+    if (queryFilter && ['all', 'debtors', 'settled', 'overdue'].includes(queryFilter)) {
+      setFilterType(queryFilter as 'all' | 'debtors' | 'settled' | 'overdue');
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('filter');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const balances = useMemo(() => getCustomerBalances(db), [db]);
 
@@ -131,6 +146,9 @@ export function CustomersTab({
       }
       if (filterType === 'settled') {
         return item.remainingDebt === 0;
+      }
+      if (filterType === 'overdue') {
+        return item.isOverdue && item.remainingDebt > 0;
       }
       return true;
     });
@@ -285,7 +303,7 @@ export function CustomersTab({
             {searchQuery ? (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 left-3 flex items-center my-auto text-slate-400 hover:text-indigo-650 transition-colors p-1 rounded-full hover:bg-slate-200/55 cursor-pointer animate-fade-in"
+                className="absolute inset-y-0 left-3 flex items-center my-auto text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded-full hover:bg-slate-200/55 cursor-pointer animate-fade-in"
                 title="مسح البحث"
               >
                 <X className="w-3.5 h-3.5" />
@@ -297,7 +315,7 @@ export function CustomersTab({
 
           {/* Smart Search metadata tag helpers */}
           <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 px-1 leading-none -mt-1 shrink-0 pb-1">
-            <span className="flex items-center gap-0.5 text-indigo-650">
+            <span className="flex items-center gap-0.5 text-indigo-600">
               <Sparkles className="w-3 h-3 text-indigo-500 animate-pulse" />
               فلترة ذكية فورية نشطة
             </span>
@@ -343,11 +361,11 @@ export function CustomersTab({
           </div>
 
           {/* Filter segment tabs */}
-          <div className="grid grid-cols-3 gap-1 bg-slate-50 p-1 rounded-xl text-[10px] font-bold">
+          <div className="grid grid-cols-4 gap-1 bg-slate-50 p-1 rounded-xl text-[10px] font-bold">
             <button
               onClick={() => setFilterType('all')}
               className={`py-1.5 rounded-lg text-center cursor-pointer transition-all ${
-                filterType === 'all' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                filterType === 'all' ? 'bg-white text-slate-800 shadow-xs border border-slate-200/50' : 'text-slate-500 hover:text-slate-800 border border-transparent'
               }`}
             >
               الكل ({balances.length})
@@ -355,18 +373,26 @@ export function CustomersTab({
             <button
               onClick={() => setFilterType('debtors')}
               className={`py-1.5 rounded-lg text-center cursor-pointer transition-all ${
-                filterType === 'debtors' ? 'bg-white text-rose-600 shadow-xs' : 'text-slate-500 hover:text-rose-500'
+                filterType === 'debtors' ? 'bg-white text-rose-600 shadow-xs border border-rose-100/45' : 'text-slate-500 hover:text-rose-500 border border-transparent'
               }`}
             >
-              عليه دين ({balances.filter(b => b.remainingDebt > 0).length})
+              دين ({balances.filter(b => b.remainingDebt > 0).length})
             </button>
             <button
               onClick={() => setFilterType('settled')}
               className={`py-1.5 rounded-lg text-center cursor-pointer transition-all ${
-                filterType === 'settled' ? 'bg-white text-emerald-600 shadow-xs' : 'text-slate-500 hover:text-emerald-500'
+                filterType === 'settled' ? 'bg-white text-emerald-600 shadow-xs border border-emerald-100/45' : 'text-slate-500 hover:text-emerald-500 border border-transparent'
               }`}
             >
               خالص ({balances.filter(b => b.remainingDebt === 0).length})
+            </button>
+            <button
+              onClick={() => setFilterType('overdue')}
+              className={`py-1.5 rounded-lg text-center cursor-pointer transition-all ${
+                filterType === 'overdue' ? 'bg-white text-amber-600 shadow-xs border border-amber-100/45' : 'text-slate-500 hover:text-amber-500 border border-transparent'
+              }`}
+            >
+              متأخر ({balances.filter(b => b.isOverdue && b.remainingDebt > 0).length})
             </button>
           </div>
         </div>
@@ -379,100 +405,128 @@ export function CustomersTab({
               لا يوجد عملاء يطابقون خيارات البحث الحالية.
             </div>
           ) : (
-            filteredCustomers.map((item) => {
-              const isSelected = selectedCustomerId === item.customer.id;
-              
-              const queryNormalized = searchQuery.trim().toLowerCase();
-              const nameMatch = queryNormalized && item.customer.name.toLowerCase().includes(queryNormalized);
-              const phoneMatch = queryNormalized && item.customer.phone.includes(queryNormalized);
-              const notesMatch = queryNormalized && item.customer.notes && item.customer.notes.toLowerCase().includes(queryNormalized);
+            <AnimatePresence mode="popLayout">
+              {filteredCustomers.map((item, idx) => {
+                const isSelected = selectedCustomerId === item.customer.id;
+                
+                const queryNormalized = searchQuery.trim().toLowerCase();
+                const nameMatch = queryNormalized && item.customer.name.toLowerCase().includes(queryNormalized);
+                const phoneMatch = queryNormalized && item.customer.phone.includes(queryNormalized);
+                const notesMatch = queryNormalized && item.customer.notes && item.customer.notes.toLowerCase().includes(queryNormalized);
 
-              return (
-                <div
-                  key={item.customer.id}
-                  onClick={() => setSelectedCustomerId(item.customer.id)}
-                  className={`p-4 bg-white rounded-2xl border transition-all cursor-pointer hover:shadow-xs flex items-center justify-between group ${
-                    isSelected 
-                      ? 'border-indigo-500 bg-indigo-50/10 shadow-xs' 
-                      : 'border-slate-100'
-                  }`}
-                >
-                  <div className="space-y-1.5 text-right flex-1 min-w-0 pr-1">
-                    <h4 className="text-xs font-bold text-slate-805 truncate group-hover:text-indigo-650 transition-colors flex items-center gap-1.5">
-                      {item.customer.name}
-                      {nameMatch && (
-                        <span className="bg-indigo-50 border border-indigo-100/50 text-indigo-650 px-1 py-0.5 rounded text-[8px] font-black shrink-0 scale-90">الاسم</span>
-                      )}
-                    </h4>
-                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400 font-medium">
-                      <span>{item.customer.phone}</span>
-                      {item.customer.region && (
-                        <span className="bg-slate-100 text-slate-650 px-1.5 py-0.5 rounded-md font-bold text-[8px] flex items-center gap-0.5" title="المنطقة أو المدينة">
-                          <MapPin className="w-2.5 h-2.5 text-indigo-550" />
-                          {item.customer.region}
-                        </span>
-                      )}
-                      {item.isOverdue && (
-                        <span className="bg-amber-50 text-amber-600 px-1 py-0.5 rounded-sm font-bold text-[8px]">فات الاستحقاق</span>
-                      )}
-                      {sortType === 'oldest_debt' && item.remainingDebt > 0 && item.oldestDebtDate !== '9999-12-31' && (
-                        <span className="bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-sm font-bold text-[8px] tracking-tight">
-                          أقدم مستحق: {item.oldestDebtDate}
-                        </span>
-                      )}
-                      {phoneMatch && (
-                        <span className="bg-blue-50 border border-blue-100/50 text-blue-650 px-1 py-0.5 rounded-md font-bold text-[8px] tracking-tight">رقم مطابق</span>
-                      )}
-                      {notesMatch && (
-                        <span className="bg-purple-50 border border-purple-100/50 text-purple-650 px-1 py-0.5 rounded-md font-bold text-[8px] tracking-tight truncate max-w-[100px]" title={item.customer.notes}>ملاحظة مطابقة</span>
-                      )}
+                return (
+                  <motion.div
+                    key={item.customer.id}
+                    layoutId={`client-card-${item.customer.id}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={{ duration: 0.2, delay: Math.min(idx * 0.015, 0.15), ease: "easeOut" }}
+                    whileHover={{ scale: 1.01, x: -1 }}
+                    whileTap={{ scale: 0.995 }}
+                    style={{ willChange: "transform, opacity" }}
+                    onClick={() => setSelectedCustomerId(item.customer.id)}
+                    className={`p-4 bg-white rounded-2xl border cursor-pointer flex items-center justify-between group transition-[border-color,background-color] duration-150 ${
+                      isSelected 
+                        ? 'border-indigo-500 bg-indigo-50/10 shadow-xs' 
+                        : 'border-slate-100 shadow-2xs hover:border-slate-200'
+                    }`}
+                  >
+                    <div className="space-y-1.5 text-right flex-1 min-w-0 pr-1">
+                      <h4 className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors flex items-center gap-1.5">
+                        {item.customer.name}
+                        {nameMatch && (
+                          <span className="bg-indigo-50 border border-indigo-100/50 text-indigo-600 px-1 py-0.5 rounded text-[8px] font-black shrink-0 scale-90">الاسم</span>
+                        )}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400 font-medium">
+                        <span>{item.customer.phone}</span>
+                        {item.customer.region && (
+                          <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md font-bold text-[8px] flex items-center gap-0.5" title="المنطقة أو المدينة">
+                            <MapPin className="w-2.5 h-2.5 text-indigo-500" />
+                            {item.customer.region}
+                          </span>
+                        )}
+                        {item.isOverdue && (
+                          <span className="bg-amber-50 text-amber-600 px-1 py-0.5 rounded-sm font-bold text-[8px]">فات الاستحقاق</span>
+                        )}
+                        {sortType === 'oldest_debt' && item.remainingDebt > 0 && item.oldestDebtDate !== '9999-12-31' && (
+                          <span className="bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-sm font-bold text-[8px] tracking-tight">
+                            أقدم مستحق: {item.oldestDebtDate}
+                          </span>
+                        )}
+                        {phoneMatch && (
+                          <span className="bg-blue-50 border border-blue-100/50 text-blue-600 px-1 py-0.5 rounded-md font-bold text-[8px] tracking-tight">رقم مطابق</span>
+                        )}
+                        {notesMatch && (
+                          <span className="bg-purple-50 border border-purple-100/50 text-purple-600 px-1 py-0.5 rounded-md font-bold text-[8px] tracking-tight truncate max-w-[100px]" title={item.customer.notes}>ملاحظة مطابقة</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="text-left shrink-0 pl-1">
-                    <span className="text-[10px] text-slate-400 block font-semibold mb-0.5">المتبقي</span>
-                    <span className={`text-xs font-black ${
-                      item.remainingDebt > 0 ? 'text-rose-600' : 'text-emerald-600'
-                    }`}>
-                      {formatCurrency(item.remainingDebt)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
+                    
+                    <div className="text-left shrink-0 pl-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold mb-0.5">المتبقي</span>
+                      <span className={`text-xs font-black ${
+                        item.remainingDebt > 0 ? 'text-rose-600' : 'text-emerald-600'
+                      }`}>
+                        {formatCurrency(item.remainingDebt)}
+                      </span>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           )}
         </div>
       </div>
 
       {/* RIGHT COLUMN: CHOSEN CUSTOMER STATEMENT OF ACCOUNT */}
       <div className={`lg:col-span-2 ${selectedCustomerId ? 'block' : 'hidden lg:block'}`}>
-        {!activeCustomerInfo ? (
-          <div className="h-96 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-100 p-8 text-center text-slate-400 space-y-3">
-            <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
-              <FileText className="w-8 h-8" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-700">اضغط على أي عميل لمتابعة كشف الحساب</h4>
-              <p className="text-xs mt-1">يمكنك من هنا مراجعة تفاصيل المعاملات، تسجيل دفعات السداد المستلمة، وتعديل جهات الاتصال أو طباعتها.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-5 animate-slide-up bg-white rounded-2xl border border-slate-100 p-6 shadow-xs relative">
-            
-        {/* Back Button (Only seen on mobile/tablet) */}
-            <button
-              onClick={() => setSelectedCustomerId(null)}
-              className="lg:hidden flex items-center gap-1 text-xs font-semibold text-indigo-600 mb-3 cursor-pointer"
+        <AnimatePresence mode="wait">
+          {!activeCustomerInfo ? (
+            <motion.div 
+              key="placeholder-account"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              style={{ willChange: "transform, opacity" }}
+              className="h-96 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-100 p-8 text-center text-slate-400 space-y-3"
             >
-              <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
-              الرجوع لدليل العملاء
-            </button>
+              <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                <FileText className="w-8 h-8" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-700">اضغط على أي عميل لمتابعة كشف الحساب</h4>
+                <p className="text-xs mt-1">يمكنك من هنا مراجعة تفاصيل المعاملات، تسجيل دفعات السداد المستلمة، وتعديل جهات الاتصال أو طباعتها.</p>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key={activeCustomerInfo.customer.id}
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -12, scale: 0.98 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              style={{ willChange: "transform, opacity" }}
+              className="space-y-5 bg-white rounded-2xl border border-slate-100 p-6 shadow-xs relative"
+            >
+              
+          {/* Back Button (Only seen on mobile/tablet) */}
+              <button
+                type="button"
+                onClick={() => setSelectedCustomerId(null)}
+                className="lg:hidden flex items-center gap-1 text-xs font-semibold text-indigo-600 mb-3 cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
+                الرجوع لدليل العملاء
+              </button>
 
             {/* Profile Info Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-5 border-b border-slate-100 gap-4">
               <div className="space-y-1.5 text-right">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] bg-indigo-50 text-indigo-650 px-2 py-0.5 rounded-md font-bold">بطاقة عميل</span>
+                  <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md font-bold">بطاقة عميل</span>
                   {activeCustomerInfo.customer.region && (
                     <span className="text-[10px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-md font-bold flex items-center gap-1">
                       <MapPin className="w-3.5 h-3.5 text-indigo-600" />
@@ -620,7 +674,7 @@ export function CustomersTab({
                               {tx.type === 'debt' ? 'دين جديد (+)' : 'سداد دفعة (-)'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-slate-650 max-w-[180px] truncate" title={tx.notes}>
+                          <td className="px-4 py-3 text-slate-600 max-w-[180px] truncate" title={tx.notes}>
                             {tx.notes || '---'}
                           </td>
                           <td className="px-4 py-3 text-slate-500">
@@ -631,7 +685,7 @@ export function CustomersTab({
                             )}
                           </td>
                           <td className={`px-4 py-3 font-bold ${
-                            tx.type === 'debt' ? 'text-rose-600' : 'text-emerald-650'
+                            tx.type === 'debt' ? 'text-rose-600' : 'text-emerald-600'
                           }`}>
                             {tx.type === 'debt' ? '+' : '-'}{formatCurrency(tx.amount)}
                           </td>
@@ -652,8 +706,9 @@ export function CustomersTab({
               )}
             </div>
 
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
     </div>

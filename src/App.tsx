@@ -35,10 +35,21 @@ import {
   BookOpen,
   LogOut,
   RefreshCw,
-  UserCheck
+  UserCheck,
+  UserPlus
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { HashRouter, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 
 export default function App() {
+  return (
+    <HashRouter>
+      <AppContent />
+    </HashRouter>
+  );
+}
+
+function AppContent() {
   const { 
     user, 
     loading, 
@@ -50,10 +61,30 @@ export default function App() {
     logOut 
   } = useFirebase();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'customers' | 'reminders' | 'utilities' | 'guide'>('dashboard');
-  
-  // Navigation hooks to jump directly to a single customer from dashboard top list
-  const [navigationCustomerId, setNavigationCustomerId] = useState<string | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Validate active route as tabs, defaulting to dashboard
+  const validTabs = ['dashboard', 'customers', 'reminders', 'utilities', 'guide'];
+  const activeTabFromPath = location.pathname.slice(1);
+  const activeTab = validTabs.includes(activeTabFromPath) 
+    ? (activeTabFromPath as 'dashboard' | 'customers' | 'reminders' | 'utilities' | 'guide') 
+    : 'dashboard';
+
+  const setActiveTab = (tab: 'dashboard' | 'customers' | 'reminders' | 'utilities' | 'guide') => {
+    navigate(`/${tab}`);
+  };
+
+  // Automatically correct invalid routes by redirecting to dashboard
+  useEffect(() => {
+    const currentPath = location.pathname.slice(1);
+    if (!validTabs.includes(currentPath) && currentPath !== '') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [location.pathname, navigate]);
+
+  const navigationCustomerId = searchParams.get('id');
 
   // Connection Simulation state
   const [isOfflineSimulated, setIsOfflineSimulated] = useState<boolean>(false);
@@ -133,8 +164,7 @@ export default function App() {
   };
 
   const handleSelectCustomerFromDashboard = (customerId: string) => {
-    setNavigationCustomerId(customerId);
-    setActiveTab('customers');
+    navigate(`/customers?id=${customerId}`);
   };
 
   const summary = computeFinancialSummary(db);
@@ -143,13 +173,62 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans text-right" dir="rtl">
-        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl text-center space-y-4 max-w-sm w-full">
-          <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto text-indigo-600">
-            <RefreshCw className="w-6 h-6 animate-spin shrink-0" />
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          style={{ willChange: 'transform, opacity' }}
+          className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl text-center space-y-6 max-w-sm w-full relative overflow-hidden"
+        >
+          {/* Animated pulsing gradient background accent */}
+          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 animate-pulse" />
+          
+          <div className="relative flex items-center justify-center mx-auto w-20 h-20">
+            {/* Outer rings with glowing and rotating animation */}
+            <motion.div 
+              className="absolute inset-0 rounded-full border-4 border-indigo-100 border-t-indigo-600"
+              animate={{ rotate: 360 }}
+              style={{ willChange: 'transform' }}
+              transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+            />
+            <motion.div 
+              className="absolute inset-2 rounded-full border border-dashed border-emerald-500/60"
+              animate={{ rotate: -360 }}
+              style={{ willChange: 'transform' }}
+              transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
+            />
+            {/* Center icon / emoji representing the food group */}
+            <span className="text-4xl animate-bounce">🌾</span>
           </div>
-          <h3 className="text-sm font-black text-slate-800">جاري التفويض والربط السحابي</h3>
-          <p className="text-xs text-slate-450 leading-relaxed">يرجى الانتظار ثوانٍ قلائل لحين جلب بروتوكولات حماية التاجر والتحقق من حساب المتجر القائم...</p>
-        </div>
+
+          <div className="space-y-2">
+            <motion.h3 
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              style={{ willChange: 'transform, opacity' }}
+              className="text-sm font-black text-slate-800"
+            >
+              جاري التفويض والربط السحابي
+            </motion.h3>
+            <motion.p 
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              style={{ willChange: 'transform, opacity' }}
+              className="text-[11px] text-slate-450 leading-relaxed font-semibold"
+            >
+              يرجى الانتظار ثوانٍ قلائل لحين جلب بروتوكولات حماية التاجر والتحقق من حساب المتجر القائم...
+            </motion.p>
+          </div>
+          
+          {/* Subtle loading loader bar overlay dots */}
+          <div className="flex justify-center gap-1.5 pt-1">
+            <span className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+            <span className="w-2 h-2 bg-sky-500 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+          </div>
+        </motion.div>
       </div>
     );
   }
@@ -180,14 +259,14 @@ export default function App() {
         {/* Dynamic Tenant Profile Block */}
         <div className="p-4 mx-4 mt-4 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between gap-3 shrink-0">
           <div className="truncate text-right">
-            <span className="text-[9px] text-amber-550 font-bold block">حساب المندوب المعتمد</span>
+            <span className="text-[9px] text-amber-500 font-bold block">حساب المندوب المعتمد</span>
             <span className="text-[11px] font-black text-slate-200 truncate block mt-0.5" title={user.email || ''}>
               {user.email}
             </span>
           </div>
           <button 
             onClick={() => logOut()} 
-            className="w-8 h-8 rounded-lg bg-red-650/10 hover:bg-red-650/20 text-red-400 flex items-center justify-center transition-all cursor-pointer shrink-0"
+            className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-all cursor-pointer shrink-0"
             title="تسجيل الخروج"
           >
             <LogOut className="w-4 h-4" />
@@ -315,9 +394,10 @@ export default function App() {
             <div className="flex gap-2">
               <button
                 onClick={triggerAddCustomer}
-                className="bg-sky-900 hover:bg-sky-950 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-xs shrink-0 cursor-pointer border-b-2 border-amber-400 flex items-center gap-1"
+                className="bg-sky-900 hover:bg-sky-950 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-xs shrink-0 cursor-pointer border-b-2 border-amber-400 flex items-center gap-2"
               >
-                <span>+ إضافة عميل جديد</span>
+                <UserPlus className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>إضافة عميل جديد</span>
               </button>
             </div>
           </div>
@@ -346,9 +426,10 @@ export default function App() {
                 </button>
                 <button
                   onClick={triggerAddCustomer}
-                  className="bg-sky-900 hover:bg-sky-950 border-b border-amber-500 text-white text-[9px] font-black px-2.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-0.5"
+                  className="bg-sky-900 hover:bg-sky-950 border-b border-amber-500 text-white text-[9px] font-black px-2.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  + عميل جديد
+                  <UserPlus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>عميل جديد</span>
                 </button>
               </div>
             </div>
@@ -424,40 +505,51 @@ export default function App() {
 
         {/* D. BODY AND SCENE CONTENT CONTAINER */}
         <main className="flex-1 p-4 md:p-8 overflow-y-auto max-w-7xl w-full mx-auto md:max-w-none">
-          {activeTab === 'dashboard' && (
-            <DashboardTab 
-              db={db} 
-              onSelectCustomer={handleSelectCustomerFromDashboard} 
-            />
-          )}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              style={{ willChange: "transform, opacity" }}
+            >
+              {activeTab === 'dashboard' && (
+                <DashboardTab 
+                  db={db} 
+                  onSelectCustomer={handleSelectCustomerFromDashboard} 
+                />
+              )}
 
-          {activeTab === 'customers' && (
-            <CustomersTab
-              db={db}
-              onRefresh={() => {}}
-              selectedCustomerIdInitially={navigationCustomerId}
-              clearInitialSelection={() => setNavigationCustomerId(null)}
-              onAddCustomerTrigger={triggerAddCustomer}
-              onAddTransactionTrigger={triggerAddTransaction}
-              onEditCustomerTrigger={triggerEditCustomer}
-            />
-          )}
+              {activeTab === 'customers' && (
+                <CustomersTab
+                  db={db}
+                  onRefresh={() => {}}
+                  selectedCustomerIdInitially={navigationCustomerId}
+                  clearInitialSelection={() => navigate('/customers', { replace: true })}
+                  onAddCustomerTrigger={triggerAddCustomer}
+                  onAddTransactionTrigger={triggerAddTransaction}
+                  onEditCustomerTrigger={triggerEditCustomer}
+                />
+              )}
 
-          {activeTab === 'reminders' && (
-            <RemindersTab 
-              db={db} 
-            />
-          )}
+              {activeTab === 'reminders' && (
+                <RemindersTab 
+                  db={db} 
+                />
+              )}
 
-          {activeTab === 'utilities' && (
-            <UtilitiesTab
-              onRefresh={() => {}}
-              isOfflineSimulated={isOfflineSimulated}
-              onToggleOfflineSimulated={handleToggleOffline}
-            />
-          )}
+              {activeTab === 'utilities' && (
+                <UtilitiesTab
+                  onRefresh={() => {}}
+                  isOfflineSimulated={isOfflineSimulated}
+                  onToggleOfflineSimulated={handleToggleOffline}
+                />
+              )}
 
-          {activeTab === 'guide' && <GuideTab />}
+              {activeTab === 'guide' && <GuideTab />}
+            </motion.div>
+          </AnimatePresence>
         </main>
 
         {/* E. FOOTER */}
