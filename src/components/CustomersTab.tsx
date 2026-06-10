@@ -75,7 +75,14 @@ export function CustomersTab({
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
-    message: string;
+    message?: string;
+    details?: {
+      type: 'debt' | 'payment' | 'customer';
+      amountLabel?: string;
+      secondaryLabel?: string;
+      dateLabel?: string;
+      notesLabel?: string;
+    };
     onConfirm: () => void;
   } | null>(null);
 
@@ -206,10 +213,20 @@ export function CustomersTab({
   };
 
   const handleDeleteCustomerClicked = (id: string, name: string) => {
+    const customer = db.customers.find(c => c.id === id);
+    const regionText = customer?.region ? customer.region : 'غير محددة';
+    const phoneText = customer?.phone ? customer.phone : 'غير متوفر';
+
     setConfirmDialog({
       isOpen: true,
-      title: 'حذف العميل',
-      message: `هل أنت متأكد من حذف العميل "${name}" نهائياً من النظام؟ لا يمكن التراجع عن هذا الإجراء!`,
+      title: 'حذف حساب العميل',
+      details: {
+        type: 'customer',
+        amountLabel: name,
+        secondaryLabel: `المنطقة: ${regionText}`,
+        dateLabel: `الهاتف: ${phoneText}`,
+        notesLabel: customer?.notes || undefined,
+      },
       onConfirm: async () => {
         if (user) {
           await deleteCustomerFromFS(id);
@@ -224,10 +241,19 @@ export function CustomersTab({
   };
 
   const handleDeleteTxClicked = (txId: string) => {
+    const tx = db.transactions.find(t => t.id === txId);
+    if (!tx) return;
+
     setConfirmDialog({
       isOpen: true,
-      title: 'حذف القيد',
-      message: 'هل ترغب بالتأكيد في حذف هذا القيد المالي والرجوع عنه؟',
+      title: 'تأكيد حذف القيد المالي',
+      details: {
+        type: tx.type,
+        amountLabel: formatCurrency(tx.amount),
+        secondaryLabel: tx.type === 'debt' ? 'دين مالي (مسحوب)' : 'سداد مالي (دفعة مقبوضة)',
+        dateLabel: formatDate(tx.date),
+        notesLabel: tx.notes || undefined,
+      },
       onConfirm: async () => {
         if (user) {
           await deleteTransactionFromFS(txId);
@@ -253,28 +279,122 @@ export function CustomersTab({
       )}
       
       {/* Confirmation Dialog Component */}
-      {confirmDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full text-right" dir="rtl">
-            <h3 className="text-lg font-black text-slate-800 mb-2">{confirmDialog.title}</h3>
-            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200"
-              >
-                إلغاء
-              </button>
-              <button 
-                onClick={confirmDialog.onConfirm}
-                className="flex-1 px-4 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs hover:bg-rose-700"
-              >
-                تأكيد الحذف
-              </button>
-            </div>
+      <AnimatePresence>
+        {confirmDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConfirmDialog(null)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+            />
+            
+            {/* Dialog Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 15 }}
+              transition={{ type: 'spring', duration: 0.4 }}
+              className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full text-right border border-slate-100 z-10 relative overflow-hidden"
+              dir="rtl"
+            >
+              {/* Top Accent Bar */}
+              <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-l from-rose-500 via-amber-500 to-rose-600" />
+
+              {/* Header Icon + Title */}
+              <div className="flex items-center gap-3 mb-5 mt-2">
+                <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 leading-tight">
+                    {confirmDialog.title}
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">
+                    إجراء حساس يتطلب التحقق لضمان الدقة
+                  </p>
+                </div>
+              </div>
+
+              {/* Message */}
+              {confirmDialog.message && (
+                <p className="text-xs text-slate-600 font-medium leading-relaxed mb-6 bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  {confirmDialog.message}
+                </p>
+              )}
+
+              {/* Transaction / Customer Structured Details */}
+              {confirmDialog.details && (
+                <div className="mb-5 space-y-3">
+                  <div className="text-center p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <span className="text-[9px] font-bold text-slate-400 block mb-1">
+                      {confirmDialog.details.type === 'customer' ? 'الاسم الكامل للعميل المراد حذفه' : 'القيمة المالية المسجلة بالقيد'}
+                    </span>
+                    <span className={`text-base font-black ${
+                      confirmDialog.details.type === 'debt' 
+                        ? 'text-rose-600' 
+                        : confirmDialog.details.type === 'payment' 
+                        ? 'text-emerald-600' 
+                        : 'text-slate-800'
+                    }`}>
+                      {confirmDialog.details.amountLabel}
+                    </span>
+                    {confirmDialog.details.secondaryLabel && (
+                      <span className="text-[10px] font-black text-slate-500 block mt-1.5 bg-white border border-slate-200/40 rounded-full py-0.5 px-3.5 inline-block mx-auto shadow-xs">
+                        {confirmDialog.details.secondaryLabel}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-1.5 text-[11px] font-bold text-slate-600 bg-slate-50/40 rounded-xl p-1">
+                    {confirmDialog.details.dateLabel && (
+                      <div className="flex items-center justify-between p-2 hover:bg-white rounded-lg transition-all">
+                        <span className="text-slate-400 font-medium select-none">
+                          {confirmDialog.details.type === 'customer' ? 'رقم الهاتف:' : 'تاريخ القيد:'}
+                        </span>
+                        <span>{confirmDialog.details.dateLabel}</span>
+                      </div>
+                    )}
+                    {confirmDialog.details.notesLabel && (
+                      <div className="p-2 hover:bg-white rounded-lg transition-all border border-dashed border-slate-100 mt-1">
+                        <span className="text-slate-400 font-medium block mb-1 select-none">
+                          بيان الملاحظة الموثقة:
+                        </span>
+                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed bg-slate-100/30 rounded-lg p-2 text-right">
+                          {confirmDialog.details.notesLabel}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Security warning notice */}
+              <div className="text-[9px] text-rose-500 font-bold bg-rose-50/30 border border-rose-100/30 rounded-xl p-2.5 text-center mb-5">
+                ⚠️ تنبيه: بمجرد التأكيد، سيتم حذف السجل نهائياً وتحديث كافة التقارير والحسابات المرتبطة تلقائياً. لا يمكن التراجع عن هذا الإجراء لضمان الدقة المالية.
+              </div>
+
+              {/* Actions Footer */}
+              <div className="flex gap-2.5">
+                <button 
+                  onClick={() => setConfirmDialog(null)}
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200/50 hover:border-slate-300 text-slate-700 font-bold rounded-xl text-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center"
+                >
+                  إلغاء التراجع
+                </button>
+                <button 
+                  onClick={confirmDialog.onConfirm}
+                  className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center"
+                >
+                  تأكيد الحذف
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
       {/* LEFT COLUMN: CUSTOMERS DIRECTORY */}
       <div className={`lg:col-span-1 space-y-4 ${selectedCustomerId ? 'hidden lg:block' : 'block'}`}>
         {/* Actions & Filters Header */}
@@ -649,8 +769,8 @@ export function CustomersTab({
                   لا توجد أي قيود مالية مقيدة في ذمة هذا العميل حتى الآن.
                 </div>
               ) : (
-                <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                  <table className="w-full text-right text-xs">
+                <div className="border border-slate-100 rounded-2xl overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
+                  <table className="w-full min-w-[650px] text-right text-xs">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-100 text-slate-505 text-[10px] font-bold">
                         <th className="px-4 py-2.5">التاريخ</th>
@@ -692,10 +812,10 @@ export function CustomersTab({
                           <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => handleDeleteTxClicked(tx.id)}
-                              className="text-slate-400 hover:text-red-600 p-1 rounded-sm hover:bg-slate-100 transition-colors cursor-pointer"
+                              className="text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-100 p-1.5 rounded-lg transition-all cursor-pointer inline-flex items-center justify-center shadow-2xs hover:shadow-xs hover:scale-105 active:scale-95"
                               title="حذف هذا القيد المالي"
                             >
-                              <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </td>
                         </tr>
