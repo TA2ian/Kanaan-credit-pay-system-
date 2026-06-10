@@ -1,20 +1,84 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# دفتر الديون (Debt Tracker App)
 
-# Run and deploy your AI Studio app
+هذا هو التوثيق الشامل لجميع الأوامر، البنية التحتية، وتعليمات واجهات الاستخدام الخاصة بالتطبيق لكي تتمكن من استنساخه أو تشغيله على بيئتك المحلية.
 
-This contains everything you need to run your app locally.
+## 🏗️ البنية التحتية والمكدس التقني (Tech Stack)
 
-View your app in AI Studio: https://ai.studio/apps/48ffa666-fa04-488b-abeb-bb659b49e38d
+*   **إطار العمل:** React 19 مع Vite
+*   **الخادم (Backend):** Node.js مع إطار عمل Express (متواجد في `server.ts`)
+*   **قواعد البيانات والمصادقة:** Firebase (Firestore للبيانات + Firebase Auth للمصادقة)
+*   **الأنماط والتصميم:** Tailwind CSS (الإصدار 4) للملفات النمطية
+*   **الأيقونات المتاحة:** مكتبة `lucide-react`
+*   **الحركات التفاعلية:** مكتبة `motion` (Framer Motion)
+*   **المخططات البيانية المستعملة:** مكتبة `recharts`
+*   **تصدير الـ PDF:** مكتبات `jspdf` و `jspdf-autotable` و `html2pdf.js`
+*   **دعم PWA:** يدعم Progressive Web App (يمكن تثبيته كمتجر إلكتروني)
 
-## Run Locally
+## 📁 هيكلية المشروع الأساسية
 
-**Prerequisites:**  Node.js
+*   `server.ts`: نقطة إطلاق السيرفر والخادم المحلي الذي يخدم الملفات ويربط الواجهة الخلفية إن وجدت.
+*   `src/main.tsx`: نقطة الإطلاق الأساسية لتطبيق React في واجهة العميل.
+*   `src/App.tsx`: يحتوي على نظام التوجيه وإدارة الحالة الأساسية.
+*   **شجرة المكونات (`src/components/`)**:
+    *   `DashboardTab.tsx`: لوحة التحكم والمؤشرات والرسوم البيانية.
+    *   `CustomersTab.tsx`: شاشة تفاصيل العملاء، الديون، المدفوعات وتعديلها.
+    *   `RemindersTab.tsx`: تبويب المواعيد والتذكيرات الخاصة بالمدفوعات المتأخرة.
+    *   `UtilitiesTab.tsx`: شاشة الأدوات (النسخ الاحتياطي، المزامنة، الإعدادات).
+    *   `GuideTab.tsx`: شاشة للمساعدة والإرشادات.
+    *   `PrintStatementTemplate.tsx` / `StatementPreviewModal.tsx`: مكونات معاينة وطباعة كشوفات الحساب بصيغة PDF.
+    *   `Modals.tsx` / `BaseModal.tsx`: النوافذ المنبثقة العامة وإنشاء الحركات المالية.
+    *   `LoginScreen.tsx`: شاشة تسجيل الدخول المرتبطة ببيانات Firebase.
+    *   `QuickActionFAB.tsx`: الزر العائم لاتخاذ إجراءات سريعة.
+*   **المنطق والخدمات (`src/lib/`)**:
+    *   `db.ts`: نظام الإدارة والأنواع (Types) وكافة الحسابات المالية (Summary/Balances).
+    *   `firebase.ts`: إعدادات الاتصال بـ Firebase.
+    *   `FirebaseContext.tsx`: نظام المزود (Context Provider) لإدارة الجلسة وبيانات Firestore بشكل متزامن.
+    *   `utils.ts`: أدوات تنسيق التاريخ، العملات، وأدوات الدعم.
 
+## 🛠️ الأوامر الأساسية (Commands)
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+يتم تشغيل المشروع باستعمال بيئة Node.js. تأكد من تثبيت مكتبات المشروع أولاً:
+
+```bash
+# تنزيل جميع إعتمادات وحزم المشروع
+npm install
+```
+
+### بيئة التطوير (Development)
+```bash
+# تشغيل خادم التطوير (Express + Vite) على المنفذ 3000
+npm run dev
+```
+
+### البناء والإنتاج (Production)
+```bash
+# بناء نسخة الإنتاج الخاصة بالعميل (Vite) وبناء خادم الـ Node.js
+npm run build
+
+# تشغيل النسخة المنتجة
+npm run start
+```
+
+## 🔐 إعدادات المتغيرات البيئية (.env)
+
+لكي يعمل التطبيق محلياً بصورة صحيحة وبدون أخطاء Firebase، يجب إنشاء ملف `.env` في المسار الجذري ووضع المعرفات التالية بداخله (والتي تمثل معلومات اتصالك بـ Firebase):
+
+```env
+VITE_FIREBASE_API_KEY="..."
+VITE_FIREBASE_AUTH_DOMAIN="..."
+VITE_FIREBASE_PROJECT_ID="..."
+VITE_FIREBASE_STORAGE_BUCKET="..."
+VITE_FIREBASE_MESSAGING_SENDER_ID="..."
+VITE_FIREBASE_APP_ID="..."
+```
+
+## 🎨 تعليمات وتوجيهات واجهات الاستخدام (UI Guidelines)
+
+1.  **المظهر العام:** يتم استخدام Tailwind CSS بنهج الـ Utility-First. الألوان الأساسية تركز على `slate` (الرمادي المتدرج)، `indigo`/`blue` للحركات الأساسية، و `rose` / `emerald` لحالات الدفع والتأكيد.
+2.  **التصميم المتجاوب (Responsive):** مجهز ليعمل على الهاتف كأولوية باستخدام أصناف Tailwind مثل `w-full` والمقاسات القياسية.
+3.  **النوافذ المنبثقة (Modals):** مجهزة بإضافة نافذة تأكيد (Dialog) مع نظام ألوان يحافظ على الدقة، ويمنع الحذف أو التعديل عن طريق الخطأ. استخدام الحركات الديناميكية باستخدام AnimatePresence عبر `framer-motion`.
+4.  **تأكيد الإجراءات (Confirmation):** لا يُسمح بتعديل أو حذف القيود الحساسة إلا بعد المرور بنقطة تأكيد حواري شاملة.
+
+---
+
+> يمكن تصدير واستخراج هذا المشروع محلياً لاستخدامه في VS Code أو Android Studio كـ Web App مغلف (WebView أو Capacitor أو مفصول كلياً).
