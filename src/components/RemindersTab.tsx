@@ -6,7 +6,7 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DatabaseState, getCustomerBalances, CustomerBalance } from '../lib/db';
-import { formatCurrency, formatPhoneNumberForUrl } from '../lib/utils';
+import { formatCurrency, formatPhoneNumberForUrl, getGeminiHeaders } from '../lib/utils';
 import { 
   Send, 
   MessageSquare, 
@@ -106,6 +106,7 @@ export function RemindersTab({ db }: RemindersTabProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getGeminiHeaders(),
         },
         body: JSON.stringify({
           customerName: selectedDebtorBalance.customer.name,

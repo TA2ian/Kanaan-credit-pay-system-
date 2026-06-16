@@ -9,13 +9,35 @@ import { BookOpen, LogIn, Sparkles, Chrome, Mail, Lock, CheckCircle2, AlertTrian
 import { motion } from 'motion/react';
 
 export function LoginScreen() {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useFirebase();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword } = useFirebase();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError('يرجى إدخال بريدك الإلكتروني أولاً لإرسال رابط استعادة كلمة المرور.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await resetPassword(email);
+      setSuccess('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني بنجاح. يرجى مراجعة صندوق الوارد.');
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'auth/user-not-found') {
+        setError('لا يوجد حساب مرتبط بهذا البريد الإلكتروني.');
+      } else {
+        setError('تعذر إرسال رابط استعادة كلمة المرور. تأكد من صحة البريد الإلكتروني.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,7 +149,18 @@ export function LoginScreen() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">كلمة المرور الحامية</label>
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-700">كلمة المرور الحامية</label>
+                {!isSignUp && (
+                  <button 
+                    type="button" 
+                    onClick={handleResetPassword}
+                    className="text-[10px] text-indigo-600 font-bold hover:underline"
+                  >
+                    نسيت كلمة المرور؟
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <input
                   type="password"

@@ -59,3 +59,24 @@ export function formatDate(dateStr: string): string {
     return dateStr;
   }
 }
+
+/**
+ * Retrieves custom Gemini API headers configured from the system tools tab.
+ */
+export function getGeminiHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const customKey = localStorage.getItem('custom_gemini_api_key');
+  const customUrl = localStorage.getItem('custom_gemini_api_url');
+  const disableDefault = localStorage.getItem('disable_default_gemini_key');
+
+  if (customKey) {
+    headers['x-gemini-key'] = customKey;
+  }
+  if (customUrl) {
+    headers['x-gemini-url'] = customUrl;
+  }
+  if (disableDefault === 'true') {
+    headers['x-disable-default-key'] = 'true';
+  }
+  return headers;
+}

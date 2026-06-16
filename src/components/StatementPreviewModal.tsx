@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, Wand2 } from 'lucide-react';
 import { BaseModal } from './BaseModal';
 import { Customer, Transaction, CustomerBalance } from '../lib/db';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, getGeminiHeaders } from '../lib/utils';
 import { PrintStatementTemplate } from './PrintStatementTemplate';
 
 interface StatementPreviewModalProps {
@@ -24,7 +25,10 @@ export function StatementPreviewModal({ isOpen, onClose, balance, transactions }
     try {
       const response = await fetch('/api/gemini/reminder', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getGeminiHeaders()
+        },
         body: JSON.stringify({
           customerName: balance.customer.name,
           amount: balance.remainingDebt,
@@ -44,12 +48,14 @@ export function StatementPreviewModal({ isOpen, onClose, balance, transactions }
   };
 
   if (isPrintView) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-white overflow-y-auto">
-        <button onClick={() => setIsPrintView(false)} className="print:hidden p-4 text-indigo-900 font-bold">إغلاق المعاينة</button>
-        <PrintStatementTemplate balance={balance} transactions={transactions} reminder={includeReminder ? aiReminder : ''} />
+    const content = (
+      <div id="print-overlay" className="fixed inset-0 z-[100] bg-slate-100 overflow-y-auto flex flex-col items-center justify-start print:static print:h-auto print:overflow-visible print:bg-white print:p-0 print:m-0" dir="rtl">
+        <div className="w-full max-w-3xl px-2 sm:px-4 flex-1 pb-8 print:p-0 print:max-w-none print:w-full print:block">
+          <PrintStatementTemplate balance={balance} transactions={transactions} reminder={includeReminder ? aiReminder : ''} onClose={() => setIsPrintView(false)} />
+        </div>
       </div>
     );
+    return createPortal(content, document.body);
   }
 
   return (
@@ -81,7 +87,7 @@ export function StatementPreviewModal({ isOpen, onClose, balance, transactions }
             
             {includeReminder && (
                 <div className="space-y-2">
-                    <button onClick={generateAiReminder} className="flex items-center gap-2 text-xs text-indigo-700 bg-indigo-50 px-2 py-1 rounded">
+                    <button type="button" onClick={generateAiReminder} className="flex items-center gap-2 text-xs text-indigo-700 bg-indigo-50 px-2 py-1 rounded">
                         <Wand2 className="w-3 h-3"/> {isGeneratingAi ? 'جاري التوليد...' : 'توليد رسالة تذكير ذكية'}
                     </button>
                     <textarea value={aiReminder} onChange={(e) => setAiReminder(e.target.value)} className="w-full border p-2 text-sm rounded-lg" rows={3} />
@@ -90,8 +96,9 @@ export function StatementPreviewModal({ isOpen, onClose, balance, transactions }
         </div>
 
         <button 
+          type="button"
           onClick={() => setIsPrintView(true)}
-          className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white font-bold p-3 rounded-xl hover:bg-indigo-700"
+          className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white font-bold p-3 rounded-xl hover:bg-indigo-700 cursor-pointer"
         >
           <Printer className="w-4 h-4" />
           معاينة الطباعة (HTML)

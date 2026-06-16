@@ -382,7 +382,7 @@ export function CustomersTab({
                   onClick={() => setConfirmDialog(null)}
                   className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200/50 hover:border-slate-300 text-slate-700 font-bold rounded-xl text-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center"
                 >
-                  إلغاء التراجع
+                  إلغاء
                 </button>
                 <button 
                   onClick={confirmDialog.onConfirm}

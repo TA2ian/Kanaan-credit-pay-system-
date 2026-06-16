@@ -19,7 +19,26 @@ app.use(express.json());
 
 // Initialize Gemini SDK lazily
 let ai: GoogleGenAI | null = null;
-function getGeminiClient(): GoogleGenAI {
+function getGeminiClient(customKey?: string, customUrl?: string, disableDefault?: boolean): GoogleGenAI {
+  if (customKey && customKey.trim().length > 0) {
+    const config: any = {
+      apiKey: customKey.trim(),
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build-custom',
+        },
+      },
+    };
+    if (customUrl && customUrl.trim().length > 0) {
+      config.baseURL = customUrl.trim();
+    }
+    return new GoogleGenAI(config);
+  }
+
+  if (disableDefault) {
+    throw new Error('DEFAULT_API_KEY_DISABLED');
+  }
+
   if (!ai) {
     const key = process.env.GEMINI_API_KEY;
     if (!key || key === 'MY_GEMINI_API_KEY') {
@@ -58,8 +77,12 @@ async function handleGeminiReminder(req: express.Request, res: express.Response)
     });
   }
 
+  const customKey = req.headers['x-gemini-key'] as string | undefined;
+  const customUrl = req.headers['x-gemini-url'] as string | undefined;
+  const disableDefault = req.headers['x-disable-default-key'] === 'true';
+
   try {
-    const aiClient = getGeminiClient();
+    const aiClient = getGeminiClient(customKey, customUrl, disableDefault);
     
     let instructionSuffix = "";
     if (tone === "gentle" || tone === "friendly") {
@@ -101,9 +124,15 @@ ${instructionSuffix}
     });
   } catch (error: any) {
     console.error("Gemini Route Error:", error);
+    if (error.message === 'DEFAULT_API_KEY_DISABLED') {
+      return res.status(403).json({
+        error: 'عذراً! تم إلغاء ربط وتعطيل مفتاح الـ API الافتراضي للموقع. يرجى تزويد مفتاح API مخصص أو إعادة تمكين المفتاح الافتراضي من شاشة أدوات النظام لاستخدام الذكاء الاصطناعي.',
+      });
+    }
+    
     if (error.message === 'GEMINI_API_KEY_MISSING') {
       return res.status(403).json({
-        error: 'أداة الذكاء الاصطناعي تحتاج لمفتاح ربط (GEMINI_API_KEY). يرجى التأكد من إضافته في لوحة الإعدادات (Settings > Secrets) في استوديو الذكاء الاصطناعي.',
+        error: 'أداة الذكاء الاصطناعي تحتاج لمفتاح ربط (GEMINI_API_KEY). يرجى التأكد من إضافته في لوحة الإعدادات (Settings > Secrets) في استوديو الذكاء الاصطناعي، أو إدخال مفتاح مخصص في أدوات النظام.',
       });
     }
     
@@ -111,7 +140,7 @@ ${instructionSuffix}
       return res.status(503).json({ error: "نظام الذكاء الاصطناعي مشغول حالياً بسبب ضغط الطلبات. يرجى المحاولة بعد قليل." });
     }
     
-    return res.status(500).json({ error: "فشل الاتصال بذكاء كنعان الاصطناعي." });
+    return res.status(500).json({ error: "فشل الاتصال بذكاء كنعان الاصطناعي. يرجى التحقق من صحة مفتاح الـ API ورابط الـ URL المدخل." });
   }
 }
 

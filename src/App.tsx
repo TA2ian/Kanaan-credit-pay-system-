@@ -19,7 +19,6 @@ import { DashboardTab } from './components/DashboardTab';
 import { CustomersTab } from './components/CustomersTab';
 import { RemindersTab } from './components/RemindersTab';
 import { UtilitiesTab } from './components/UtilitiesTab';
-import { GuideTab } from './components/GuideTab';
 import { CustomerModal, TransactionModal } from './components/Modals';
 import { useFirebase } from './lib/FirebaseContext';
 import { LoginScreen } from './components/LoginScreen';
@@ -66,13 +65,13 @@ function AppContent() {
   const [searchParams] = useSearchParams();
 
   // Validate active route as tabs, defaulting to dashboard
-  const validTabs = ['dashboard', 'customers', 'reminders', 'utilities', 'guide'];
+  const validTabs = ['dashboard', 'customers', 'reminders', 'utilities'];
   const activeTabFromPath = location.pathname.slice(1);
   const activeTab = validTabs.includes(activeTabFromPath) 
-    ? (activeTabFromPath as 'dashboard' | 'customers' | 'reminders' | 'utilities' | 'guide') 
+    ? (activeTabFromPath as 'dashboard' | 'customers' | 'reminders' | 'utilities') 
     : 'dashboard';
 
-  const setActiveTab = (tab: 'dashboard' | 'customers' | 'reminders' | 'utilities' | 'guide') => {
+  const setActiveTab = (tab: 'dashboard' | 'customers' | 'reminders' | 'utilities') => {
     navigate(`/${tab}`);
   };
 
@@ -323,19 +322,7 @@ function AppContent() {
             }`}
           >
             <Settings className="w-4.5 h-4.5 shrink-0 opacity-90" />
-            <span>أدوات النظام والنسخ</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('guide')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-right cursor-pointer mt-4 ${
-              activeTab === 'guide'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-emerald-400 hover:bg-emerald-500/10'
-            }`}
-          >
-            <BookOpen className="w-4.5 h-4.5 shrink-0 opacity-90" />
-            <span>دليل استخدام النظام</span>
+            <span>أدوات النظام والمزامنة</span>
           </button>
         </div>
 
@@ -373,7 +360,6 @@ function AppContent() {
               {activeTab === 'customers' && 'كشف حسابات العملاء والدفعات'}
               {activeTab === 'reminders' && 'مساعد التذكيرات الذكي وصياغة Gemini AI'}
               {activeTab === 'utilities' && 'نسخ احتياطي واسترجاع وإعدادات الدفتر'}
-              {activeTab === 'guide' && 'دليل استخدام نظام كنعان الميداني'}
             </h2>
             <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-1 rounded">المزامنة: سحابي فوري ⚡</span>
           </div>
@@ -486,17 +472,7 @@ function AppContent() {
                     : 'bg-slate-100 text-slate-600'
                 }`}
               >
-                أدوات النسخ
-              </button>
-              <button
-                onClick={() => setActiveTab('guide')}
-                className={`py-2 px-3 rounded-lg text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
-                  activeTab === 'guide'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                دليل الاستخدام
+                أدوات النظام والمزامنة
               </button>
             </div>
 
@@ -546,8 +522,6 @@ function AppContent() {
                   onToggleOfflineSimulated={handleToggleOffline}
                 />
               )}
-
-              {activeTab === 'guide' && <GuideTab />}
             </motion.div>
           </AnimatePresence>
         </main>

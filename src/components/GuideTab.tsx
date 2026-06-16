@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, BellRing, Settings, BookOpen, Receipt, Server, Share2, Calculator } from 'lucide-react';
+import { LayoutDashboard, Users, BellRing, Settings, BookOpen, Receipt, Server, Share2, Calculator, Key, Sparkles } from 'lucide-react';
 
 export function GuideTab() {
   return (
@@ -121,8 +121,83 @@ export function GuideTab() {
             <div>
               <h3 className="text-lg font-bold text-slate-800 mb-2">تصدير واستيراد البيانات</h3>
               <p className="text-sm text-slate-500 leading-relaxed">
-                من خلال تبويب "أدوات النظام"، يمكنك تصدير سجلاتك كاملة بصيغة JSON كنسخة احتياطية آمنة على جهازك لاسترجاعها في أي وقت دون الحاجة للاتصال بالإنترنت.
+                من خلال تبويب "أدوات النظام"، يمكنك تصدير سجلاتك كاملة بصيغة JSON كنسخة احتياطية آمنة على جهازك لاسترجاعها في أي وقت، مع واجهة ذكية تدعم السحب والإفلات ومعاينة البيانات قبل تنزيلها.
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 8: Brand & Logo Customization */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm transition hover:shadow-md">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+              <Receipt className="w-5 h-5 text-orange-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">تخصيص هوية المحل وهيدر الفواتير</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                يتيح لك النظام رفع أو سحب شعار خاص بمحلك التجاري من شاشة "أدوات النظام". يتم تخزينه بالكامل محلياً على المتصفح ليظهر تلقائياً مدمجاً في أعلى كشوفات الحساب المطبوعة والفواتير لتعزيز طابعك المهني.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 9: Network Simulator */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm transition hover:shadow-md">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+              <Server className="w-5 h-5 text-teal-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">أداة محاكاة الشبكة بالميدان</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                بفضل مفتاح المحاكاة الذكي المتوفر في شاشة الإعدادات، يمكنك الآن إجبار النظام على الدخول في وضعية "عدم الاتصال" يدوياً لاختبار سلوك العمل والتأكد من مرونة حفظ العمليات وقدرة التزامن السحابي عند إعادة الاتصال.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 10: Gemini API Key Setup */}
+        <div className="bg-gradient-to-br from-indigo-50/60 to-slate-50 border border-indigo-100/60 p-6 rounded-2xl shadow-sm transition hover:shadow-md col-span-1 md:col-span-2">
+          <div className="flex flex-col md:flex-row items-start gap-5">
+            <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-100">
+              <Key className="w-6 h-6 animate-pulse" />
+            </div>
+            <div className="space-y-4 flex-1">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-1.5">
+                  تفعيل مفتاح Gemini AI مخصص وفك الارتباط
+                  <Sparkles className="w-4 h-4 text-indigo-500 animate-bounce" />
+                </h3>
+                <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+                  يتيح لك نظام كنعان الميداني ربط مفتاح API مخصص أو استخدام عنوان بوابة اتصال بديلة لتوليد رسائل التذكير المالي وتحليل أرصدة الزبائن ذاتياً ومجاناً، مع إمكانية إزالة هذا الربط بالكامل للعودة إلى الاتصال الافتراضي في أي وقت.
+                </p>
+              </div>
+
+              <div className="bg-white border border-slate-200/50 rounded-xl p-4 space-y-3">
+                <h4 className="text-xs font-bold text-slate-700">خطوات الحصول على مفتاح Gemini API وتفعيله بالنظام:</h4>
+                <ol className="text-xs text-slate-600 space-y-2.5 list-decimal list-inside leading-relaxed pr-2">
+                  <li>
+                    <strong>الذهاب لمنصة Google AI Studio:</strong> قم بزيارتنا عبر الرابط الرسمي <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-bold hover:underline">aistudio.google.com</a> وسجل الدخول بحساب الجيميل الخاص بك.
+                  </li>
+                  <li>
+                    <strong>الحصول على المفتاح:</strong> اضغط على زر <span className="font-bold text-slate-800">"Create API Key"</span> الموجود في القائمة الجانبية أو أعلى الصفحة.
+                  </li>
+                  <li>
+                    <strong>توليد ونسخ الكود:</strong> اختر الخيار <span className="font-bold text-indigo-600">"Create API key in new project"</span> لتوليد المفتاح المجاني، ثم انسخ الكود الناتج (والذي يبدأ عادة بـ <code className="bg-slate-100 px-1 py-0.5 rounded text-indigo-750 font-mono">AIzaSy...</code>).
+                  </li>
+                  <li>
+                    <strong>حفظ المفتاح بالتطبيق:</strong> توجه لتبويب <span className="font-bold text-slate-800">"أدوات النظام"</span> في كنعان الميداني، الصق الكود في حقل "مفتاح Gemini API" واضغط على <span className="font-bold text-indigo-600">"حفظ إعدادات الـ API"</span>.
+                  </li>
+                </ol>
+              </div>
+
+              <div className="bg-slate-100/60 border border-slate-200/20 rounded-xl p-3 text-xs text-slate-500 leading-relaxed flex items-start gap-2">
+                <span className="text-amber-500 font-black text-sm">💡</span>
+                <p>
+                  <strong>التحكم والوقاية:</strong> إذا كنت ترغب في فك الارتباط لاحقاً، يمكنك التصفح مجدداً لأدوات النظام والضغط على زر <span className="font-bold text-rose-600">"فك ربط وحذف مفتاحي"</span> لتنظيف متصفحك فوراً. كما يمكنك تعزيز خصوصيتك عبر تفعيل ميزة <span className="font-bold text-slate-800">"تعطيل استخدام مفتاح الـ API الافتراضي للموقع"</span> للتأكد من عدم استخدام أي استهلاك غير مشفر خارج رغبتك.
+                </p>
+              </div>
             </div>
           </div>
         </div>

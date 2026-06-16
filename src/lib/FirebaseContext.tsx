@@ -11,7 +11,8 @@ import {
   signOut as fbSignOut, 
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { 
   collection, 
@@ -74,6 +75,7 @@ interface FirebaseContextType {
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   logOut: () => Promise<void>;
   addCustomerToFS: (name: string, phone: string, email?: string, notes?: string, region?: string) => Promise<void>;
   updateCustomerInFS: (id: string, name: string, phone: string, email?: string, notes?: string, region?: string) => Promise<void>;
@@ -191,6 +193,15 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       await createUserWithEmailAndPassword(auth, email, pass);
     } catch (e) {
       console.error('Email Sign Up Error', e);
+      throw e;
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (e) {
+      console.error('Password Reset Error', e);
       throw e;
     }
   };
@@ -351,6 +362,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
+      resetPassword,
       logOut,
       addCustomerToFS,
       updateCustomerInFS,
