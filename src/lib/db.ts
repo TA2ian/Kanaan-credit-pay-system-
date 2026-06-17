@@ -1,5 +1,7 @@
 // /lib/db.ts
 
+export type CustomerClassification = 'distinct' | 'struggling' | 'new';
+
 export interface Customer {
   id: string;
   name: string;
@@ -9,6 +11,7 @@ export interface Customer {
   region: string;
   totalDebt: number;
   createdAt: string;
+  classification?: CustomerClassification;
 }
 
 export type TransactionType = 'debt' | 'payment';
@@ -21,6 +24,7 @@ export interface Transaction {
   date: string;
   dueDate?: string;
   notes?: string;
+  isArchived?: boolean;
 }
 
 export interface Debt {
@@ -129,20 +133,20 @@ export function savePayments(payments: Payment[]) {
 }
 
 // إضافة عميل جديد
-export function addCustomer(name: string, phone: string, email: string, notes: string, region: string): Customer {
+export function addCustomer(name: string, phone: string, email: string, notes: string, region: string, classification?: CustomerClassification): Customer {
   const list = getCustomers();
   const index = `cust-${Date.now()}`;
-  const newCustomer: Customer = { id: index, name, phone, region, totalDebt: 0, createdAt: new Date().toISOString(), email, notes };
+  const newCustomer: Customer = { id: index, name, phone, region, totalDebt: 0, createdAt: new Date().toISOString(), email, notes, classification };
   list.push(newCustomer);
   saveCustomers(list);
   return newCustomer;
 }
 
-export function updateCustomer(id: string, name: string, phone: string, email: string, notes: string, region: string): Customer {
+export function updateCustomer(id: string, name: string, phone: string, email: string, notes: string, region: string, classification?: CustomerClassification): Customer {
   const list = getCustomers();
   const index = list.findIndex(c => c.id === id);
   if (index === -1) throw new Error('Customer not found');
-  list[index] = { ...list[index], name, phone, email, notes, region };
+  list[index] = { ...list[index], name, phone, email, notes, region, classification };
   saveCustomers(list);
   return list[index];
 }

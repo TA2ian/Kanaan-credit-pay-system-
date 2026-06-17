@@ -123,30 +123,75 @@ ${instructionSuffix}
       advice: "مساعد كنعان الذكي 🌾: يُنصح بإرسال الرسالة في أوقات العمل الرسمية ومتابعة العميل بود واحترام لتوطيد ثقتكم."
     });
   } catch (error: any) {
-    console.error("Gemini Route Error:", error);
-    if (error.message === 'DEFAULT_API_KEY_DISABLED') {
-      return res.status(403).json({
-        error: 'عذراً! تم إلغاء ربط وتعطيل مفتاح الـ API الافتراضي للموقع. يرجى تزويد مفتاح API مخصص أو إعادة تمكين المفتاح الافتراضي من شاشة أدوات النظام لاستخدام الذكاء الاصطناعي.',
-      });
-    }
-    
-    if (error.message === 'GEMINI_API_KEY_MISSING') {
-      return res.status(403).json({
-        error: 'أداة الذكاء الاصطناعي تحتاج لمفتاح ربط (GEMINI_API_KEY). يرجى التأكد من إضافته في لوحة الإعدادات (Settings > Secrets) في استوديو الذكاء الاصطناعي، أو إدخال مفتاح مخصص في أدوات النظام.',
-      });
-    }
-    
-    if (error.status === 503 || error.message?.includes('high demand') || error.message?.includes('503')) {
-      return res.status(503).json({ error: "نظام الذكاء الاصطناعي مشغول حالياً بسبب ضغط الطلبات. يرجى المحاولة بعد قليل." });
-    }
-    
-    return res.status(500).json({ error: "فشل الاتصال بذكاء كنعان الاصطناعي. يرجى التحقق من صحة مفتاح الـ API ورابط الـ URL المدخل." });
+    console.error("Gemini Route Error (Reminder):", error);
+    return handleGeminiError(error, res);
   }
+}
+
+// Handler for Smart Archive Analysis
+async function handleArchiveAnalysis(req: express.Request, res: express.Response) {
+  const { summary } = req.body;
+  
+  if (!summary) return res.status(400).json({ error: 'Missing summary' });
+
+  const customKey = req.headers['x-gemini-key'] as string | undefined;
+  const customUrl = req.headers['x-gemini-url'] as string | undefined;
+  const disableDefault = req.headers['x-disable-default-key'] === 'true';
+
+  try {
+    const aiClient = getGeminiClient(customKey, customUrl, disableDefault);
+    
+    const prompt = `أنت "مساعد كنعان الذكي" 🌾 المساعد المالي لشركة كنعان لتوزيع الأغذية.
+لقد قمنا بتحليل عمليات العميل وتلخيصها كالتالي:
+${JSON.stringify(summary)}
+
+مهمتك:
+تقديم نصيحة ذكية وموجزة (سردية بلهجة لطيفة) حول سبب وجدوى أرشفة هذه العمليات.
+اشرح للتاجر أن الأرشفة تحافظ على "نظافة" الكشف وتسهل متابعة الديون الجديدة دون التأثير على الحساب النهائي.
+
+الشروط:
+1. كن مختصراً جداً (جملتين بحد أقصى).
+2. استخدم إيموجيات ملائمة (🌾 ، ✅ ، 📦).
+3. لا تذكر أي أرقام تقنية، فقط القيمة التنظيمية.`;
+
+    const response = await aiClient.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+    });
+
+    return res.json({ 
+      advice: response.text || "الأرشفة تساعدك في تنظيم حساباتك والتركيز على الديون النشطة."
+    });
+  } catch (error: any) {
+    console.error("Gemini Route Error (Archive):", error);
+    return handleGeminiError(error, res);
+  }
+}
+
+function handleGeminiError(error: any, res: express.Response) {
+  if (error.message === 'DEFAULT_API_KEY_DISABLED') {
+    return res.status(403).json({
+      error: 'عذراً! تم إلغاء ربط وتعطيل مفتاح الـ API الافتراضي للموقع. يرجى تزويد مفتاح API مخصص أو إعادة تمكين المفتاح الافتراضي من شاشة أدوات النظام لاستخدام الذكاء الاصطناعي.',
+    });
+  }
+  
+  if (error.message === 'GEMINI_API_KEY_MISSING') {
+    return res.status(403).json({
+      error: 'أداة الذكاء الاصطناعي تحتاج لمفتاح ربط (GEMINI_API_KEY). يرجى التأكد من إضافته في لوحة الإعدادات (Settings > Secrets) في استوديو الذكاء الاصطناعي، أو إدخال مفتاح مخصص في أدوات النظام.',
+    });
+  }
+  
+  if (error.status === 503 || error.message?.includes('high demand') || error.message?.includes('503')) {
+    return res.status(503).json({ error: "نظام الذكاء الاصطناعي مشغول حالياً بسبب ضغط الطلبات. يرجى المحاولة بعد قليل." });
+  }
+  
+  return res.status(500).json({ error: "فشل الاتصال بذكاء كنعان الاصطناعي. يرجى التحقق من صحة مفتاح الـ API ورابط الـ URL المدخل." });
 }
 
 // 1. API: AI Smart Debt Reminder & Analyzer
 app.post('/api/ai', handleGeminiReminder);
 app.post('/api/gemini/reminder', handleGeminiReminder);
+app.post('/api/ai/analyze-archive', handleArchiveAnalysis);
 
 // Serve frontend assets & Vite configuration
 async function startServer() {

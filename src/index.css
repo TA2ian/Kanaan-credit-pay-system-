@@ -4,10 +4,23 @@
 @theme {
   --font-sans: "Cairo", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-amber-50: var(--brand-color-light, #fef3c7);
+  --color-amber-100: var(--brand-color-light, #fef3c7);
+  --color-amber-200: var(--brand-color-light-hover, #fde68a);
+  --color-amber-500: var(--brand-color, #f59e0b);
+  --color-amber-600: var(--brand-color-hover, #d97706);
+  --color-amber-700: var(--brand-color-hover, #d97706);
+  --color-amber-800: var(--brand-color-text, #78350f);
+  --color-amber-900: var(--brand-color-text, #78350f);
 }
 
 :root {
   font-family: var(--font-sans);
+  --brand-color: #f59e0b;
+  --brand-color-hover: #d97706;
+  --brand-color-light: #fef3c7;
+  --brand-color-light-hover: #fde68a;
+  --brand-color-text: #78350f;
 }
 
 body {
@@ -17,6 +30,7 @@ body {
   text-align: right;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Beautiful custom smooth scrollbar for our columns and page */
@@ -55,47 +69,31 @@ body {
 }
 
 @media print {
-  #root {
-    display: none !important;
-  }
-  
-  body, html {
-    background-color: white !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    height: auto !important;
-    overflow: visible !important;
+  body {
+    visibility: hidden;
+    background: white !important;
   }
 
-  #print-overlay {
-    position: static !important;
-    display: block !important;
-    width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-    background-color: white !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-  
-  #pdf-content-wrapper {
-    position: static !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-    width: 100% !important;
-    max-width: none !important;
-    height: auto !important;
-    overflow: visible !important;
+  #print-area, #print-area * {
+    visibility: visible !important;
   }
 
-  /* Hide UI controls inside the print container */
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white !important;
+  }
+
+  /* Specifically hide elements marked with print:hidden */
   .print\:hidden {
     display: none !important;
   }
 
   @page {
-    margin: 10mm;
+    margin: 15mm;
   }
 }

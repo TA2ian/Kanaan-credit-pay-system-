@@ -8,6 +8,7 @@ import {
   getDatabase, 
   DatabaseState, 
   Customer, 
+  CustomerClassification,
   TransactionType,
   addCustomer,
   updateCustomer,
@@ -18,10 +19,12 @@ import { formatCurrency } from './lib/utils';
 import { DashboardTab } from './components/DashboardTab';
 import { CustomersTab } from './components/CustomersTab';
 import { RemindersTab } from './components/RemindersTab';
+import { TeamTab } from './components/TeamTab';
 import { UtilitiesTab } from './components/UtilitiesTab';
 import { CustomerModal, TransactionModal } from './components/Modals';
 import { useFirebase } from './lib/FirebaseContext';
 import { LoginScreen } from './components/LoginScreen';
+import { OnboardingScreen } from './components/OnboardingScreen';
 import { QuickActionFAB } from './components/QuickActionFAB';
 import { 
   LayoutDashboard, 
@@ -35,7 +38,8 @@ import {
   LogOut,
   RefreshCw,
   UserCheck,
-  UserPlus
+  UserPlus,
+  UserCog
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { HashRouter, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
@@ -48,10 +52,89 @@ export default function App() {
   );
 }
 
+interface ThemePreset {
+  id: string;
+  name: string;
+  primary: string;
+  hover: string;
+  light: string;
+  lightHover: string;
+  textColor: string;
+}
+
+export const THEME_PRESETS: Record<string, ThemePreset> = {
+  amber: {
+    id: 'amber',
+    name: 'الكهرماني الذهبي',
+    primary: '#f59e0b',
+    hover: '#d97706',
+    light: '#fef3c7',
+    lightHover: '#fde68a',
+    textColor: '#78350f'
+  },
+  blue: {
+    id: 'blue',
+    name: 'الأزرق الملكي',
+    primary: '#3b82f6',
+    hover: '#2563eb',
+    light: '#e0f2fe',
+    lightHover: '#bae6fd',
+    textColor: '#0369a1'
+  },
+  emerald: {
+    id: 'emerald',
+    name: 'الأخضر الزمردي',
+    primary: '#10b981',
+    hover: '#059669',
+    light: '#ecfdf5',
+    lightHover: '#d1fae5',
+    textColor: '#047857'
+  },
+  violet: {
+    id: 'violet',
+    name: 'البنفسجي الإمبراطوري',
+    primary: '#8b5cf6',
+    hover: '#7c3aed',
+    light: '#f5f3ff',
+    lightHover: '#ede9fe',
+    textColor: '#6d28d9'
+  },
+  rose: {
+    id: 'rose',
+    name: 'الأحمر المرجاني',
+    primary: '#f43f5e',
+    hover: '#e11d48',
+    light: '#fff1f2',
+    lightHover: '#ffe4e6',
+    textColor: '#be123c'
+  },
+  teal: {
+    id: 'teal',
+    name: 'السماوي التركوازي',
+    primary: '#0d9488',
+    hover: '#0f766e',
+    light: '#f0fdfa',
+    lightHover: '#ccfbf1',
+    textColor: '#0f766e'
+  },
+  indigo: {
+    id: 'indigo',
+    name: 'الكحلي الداكن',
+    primary: '#6366f1',
+    hover: '#4f46e5',
+    light: '#e0e7ff',
+    lightHover: '#c7d2fe',
+    textColor: '#4338ca'
+  }
+};
+
 function AppContent() {
   const { 
     user, 
     loading, 
+    profile,
+    profileLoading,
+    teamMembers,
     customers, 
     transactions, 
     addCustomerToFS, 
@@ -64,27 +147,6 @@ function AppContent() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Validate active route as tabs, defaulting to dashboard
-  const validTabs = ['dashboard', 'customers', 'reminders', 'utilities'];
-  const activeTabFromPath = location.pathname.slice(1);
-  const activeTab = validTabs.includes(activeTabFromPath) 
-    ? (activeTabFromPath as 'dashboard' | 'customers' | 'reminders' | 'utilities') 
-    : 'dashboard';
-
-  const setActiveTab = (tab: 'dashboard' | 'customers' | 'reminders' | 'utilities') => {
-    navigate(`/${tab}`);
-  };
-
-  // Automatically correct invalid routes by redirecting to dashboard
-  useEffect(() => {
-    const currentPath = location.pathname.slice(1);
-    if (!validTabs.includes(currentPath) && currentPath !== '') {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [location.pathname, navigate]);
-
-  const navigationCustomerId = searchParams.get('id');
-
   // Connection Simulation state
   const [isOfflineSimulated, setIsOfflineSimulated] = useState<boolean>(false);
 
@@ -96,6 +158,79 @@ function AppContent() {
   const [txCustomerId, setTxCustomerId] = useState('');
   const [txCustomerName, setTxCustomerName] = useState('');
   const [txType, setTxType] = useState<TransactionType>('debt');
+  const [txInitialAmount, setTxInitialAmount] = useState<number | undefined>(undefined);
+  const [txInitialNotes, setTxInitialNotes] = useState<string | undefined>(undefined);
+
+  const managerProfile = teamMembers?.find(m => m.role === 'manager' || m.userId === m.companyId);
+  const businessName = managerProfile?.businessName || profile?.businessName || 'مجموعة كنعان الذكية';
+  const themeColor = 'amber';
+  const selectedTheme = THEME_PRESETS[themeColor] || THEME_PRESETS.amber;
+  const businessDesc = managerProfile?.businessDesc || profile?.businessDesc || '';
+  const copyrightText = managerProfile?.copyrightText || profile?.copyrightText || 'حقوق الحسابات والنظام مطورة ومحفوظة بالكامل لسلسلة التوزيع البرية';
+
+  // Generate dynamic premium Visual Identity based on first character of business name & chosen theme color
+  const renderVisualIdentity = (size: 'sm' | 'md' = 'md') => {
+    const firstLetter = (businessName || 'ك').trim().charAt(0);
+    const isMd = size === 'md';
+    const dimensions = isMd ? 'w-10 h-10 text-base' : 'w-9 h-9 text-xs';
+    
+    const storedLogo = localStorage.getItem('company_logo');
+
+    if (storedLogo) {
+      return (
+        <div 
+          className={`${dimensions} relative overflow-hidden rounded-xl flex items-center justify-center transition-all duration-300 shadow-md`}
+          style={{ border: `1px solid ${selectedTheme.primary}20` }}
+        >
+          <img src={storedLogo} alt="شعار الشركة" className="w-full h-full object-cover" />
+        </div>
+      );
+    }
+
+    return (
+      <div 
+        className={`${dimensions} relative overflow-hidden rounded-xl flex items-center justify-center font-black text-white select-none transition-all duration-300 shadow-md`}
+        style={{
+          background: `linear-gradient(135deg, ${selectedTheme.primary} 0%, ${selectedTheme.hover} 100%)`,
+          boxShadow: `0 4px 10px -2px ${selectedTheme.primary}45, inset 0 1px 1.5px rgba(255,255,255,0.45)`,
+          border: `1px solid ${selectedTheme.primary}20`
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none rounded-xl" />
+        {/* Double layered inner frame */}
+        <div className="absolute inset-0.5 rounded-[10px] border border-white/20 pointer-events-none" />
+        {/* Monogram character */}
+        <span className="relative z-10 font-sans antialiased font-black text-white px-0.5" style={{ textShadow: '0 1.5px 3px rgba(0,0,0,0.4)' }}>
+          {firstLetter}
+        </span>
+      </div>
+    );
+  };
+
+  const navigationCustomerId = searchParams.get('id');
+
+  // Validate active route as tabs, defaulting to dashboard
+  const showTeamTab = profile && profile.businessType === 'company' && (profile.role === 'manager' || profile.role === 'assistant');
+  const validTabs = showTeamTab 
+    ? ['dashboard', 'customers', 'reminders', 'team', 'utilities'] 
+    : ['dashboard', 'customers', 'reminders', 'utilities'];
+
+  const activeTabFromPath = location.pathname.slice(1);
+  const activeTab = validTabs.includes(activeTabFromPath) 
+    ? (activeTabFromPath as 'dashboard' | 'customers' | 'reminders' | 'team' | 'utilities') 
+    : 'dashboard';
+
+  const setActiveTab = (tab: 'dashboard' | 'customers' | 'reminders' | 'team' | 'utilities') => {
+    navigate(`/${tab}`);
+  };
+
+  // Automatically correct invalid routes by redirecting to dashboard
+  useEffect(() => {
+    const currentPath = location.pathname.slice(1);
+    if (!validTabs.includes(currentPath) && currentPath !== '') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [location.pathname, navigate, validTabs]);
 
   // Ground dynamic DB on user login session
   const db: DatabaseState = user 
@@ -107,18 +242,18 @@ function AppContent() {
   };
 
   // Customer modal callback (writes to Firestore)
-  const handleSaveCustomer = async (name: string, phone: string, email?: string, notes?: string, region?: string) => {
+  const handleSaveCustomer = async (name: string, phone: string, email?: string, notes?: string, region?: string, classification?: CustomerClassification) => {
     if (user) {
       if (editingCustomer) {
-        await updateCustomerInFS(editingCustomer.id, name, phone, email, notes, region);
+        await updateCustomerInFS(editingCustomer.id, name, phone, email, notes, region, classification);
       } else {
-        await addCustomerToFS(name, phone, email, notes, region);
+        await addCustomerToFS(name, phone, email, notes, region, classification);
       }
     } else {
       if (editingCustomer) {
-        updateCustomer(editingCustomer.id, name, phone, email, notes, region);
+        updateCustomer(editingCustomer.id, name, phone, email, notes, region, classification);
       } else {
-        addCustomer(name, phone, email, notes, region);
+        addCustomer(name, phone, email, notes, region, classification);
       }
     }
     setEditingCustomer(undefined);
@@ -146,19 +281,23 @@ function AppContent() {
     setIsCustomerModalOpen(true);
   };
 
-  const triggerAddTransaction = (customerId: string, type: TransactionType) => {
+  const triggerAddTransaction = (customerId: string, type: TransactionType, initialAmount?: number, initialNotes?: string) => {
     const customer = db.customers.find(c => c.id === customerId);
     if (!customer) return;
     setTxCustomerId(customerId);
     setTxCustomerName(customer.name);
     setTxType(type);
+    setTxInitialAmount(initialAmount);
+    setTxInitialNotes(initialNotes);
     setIsTxModalOpen(true);
   };
 
-  const triggerAddGenericTransaction = (type: TransactionType) => {
+  const triggerAddGenericTransaction = (type: TransactionType, initialAmount?: number, initialNotes?: string) => {
     setTxCustomerId('');
     setTxCustomerName('');
     setTxType(type);
+    setTxInitialAmount(initialAmount);
+    setTxInitialNotes(initialNotes);
     setIsTxModalOpen(true);
   };
 
@@ -237,20 +376,71 @@ function AppContent() {
     return <LoginScreen />;
   }
 
+  // 3. Profile Loading state
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans text-right" dir="rtl">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          style={{ willChange: 'transform, opacity' }}
+          className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl text-center space-y-4 max-w-xs w-full relative overflow-hidden"
+        >
+          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-sky-900 via-indigo-500 to-amber-500 animate-pulse" />
+          <div className="relative flex items-center justify-center mx-auto w-14 h-14">
+            <motion.div 
+              className="absolute inset-0 rounded-full border-4 border-indigo-500/10 border-t-indigo-650"
+              animate={{ rotate: 360 }}
+              style={{ willChange: 'transform' }}
+              transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+            />
+            <span className="text-2xl animate-spin" style={{ animationDuration: '4s' }}>🌾</span>
+          </div>
+          <p className="text-xs font-black text-slate-850">جاري تفويض الملف المالي...</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // 4. Profile Onboarding setup required
+  if (!profile) {
+    return <OnboardingScreen />;
+  }
+
+  const translateRole = (role?: string) => {
+    switch (role) {
+      case 'manager': return 'المدير العام والمالك';
+      case 'assistant': return 'مساعد المدير العام';
+      case 'accountant': return 'المحاسب المالي';
+      case 'representative': return 'المندوب الميداني';
+      default: return 'شريك كنعان الموثوق';
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800" dir="rtl">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800 transition-colors duration-300" dir="rtl">
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          --brand-color: ${selectedTheme.primary} !important;
+          --brand-color-hover: ${selectedTheme.hover} !important;
+          --brand-color-light: ${selectedTheme.light} !important;
+          --brand-color-light-hover: ${selectedTheme.lightHover} !important;
+          --brand-color-text: ${selectedTheme.textColor} !important;
+        }
+      `}} />
       
       {/* A. SIDEBAR NAVIGATION - VISIBLE ONLY ON DESKTOP */}
       <aside className="w-68 bg-slate-950 text-white flex flex-col border-l border-slate-900 shrink-0 hidden md:flex sticky top-0 h-screen overflow-y-auto">
         {/* Branding */}
         <div className="p-6 shrink-0 border-b border-slate-900 pb-5 bg-slate-950/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-radial-at-t from-sky-900 to-sky-950 border border-amber-500/30 rounded-xl flex items-center justify-center font-black text-xl text-white shadow-md shadow-slate-950 shrink-0">
-              🌾
-            </div>
-            <div>
-              <h1 className="text-xs font-black tracking-tight text-white leading-tight">مجموعة كنعان الذكية</h1>
-              <span className="text-[10px] text-amber-500 font-bold block mt-0.5">حقيبة كنعان مندوب v1.5</span>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {renderVisualIdentity('md')}
+              <div>
+                <h1 className="text-xs font-black tracking-tight text-white leading-tight truncate max-w-[120px]">{businessName}</h1>
+                <span className="text-[10px] text-amber-500 font-bold block mt-0.5">حقيبة المندوب الذكية v1.5</span>
+              </div>
             </div>
           </div>
         </div>
@@ -258,9 +448,9 @@ function AppContent() {
         {/* Dynamic Tenant Profile Block */}
         <div className="p-4 mx-4 mt-4 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between gap-3 shrink-0">
           <div className="truncate text-right">
-            <span className="text-[9px] text-amber-500 font-bold block">حساب المندوب المعتمد</span>
-            <span className="text-[11px] font-black text-slate-200 truncate block mt-0.5" title={user.email || ''}>
-              {user.email}
+            <span className="text-[9px] text-amber-500 font-bold block">{translateRole(profile?.role)}</span>
+            <span className="text-[11px] font-black text-slate-200 truncate block mt-0.5" title={profile?.delegateName || user.email || ''}>
+              {profile?.delegateName || user.email}
             </span>
           </div>
           <button 
@@ -313,6 +503,20 @@ function AppContent() {
             )}
           </button>
 
+          {showTeamTab && (
+            <button
+              onClick={() => setActiveTab('team')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-right cursor-pointer ${
+                activeTab === 'team'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <UserCog className="w-4.5 h-4.5 shrink-0 opacity-90" />
+              <span>فريق العمل والصلاحيات</span>
+            </button>
+          )}
+
           <button
             onClick={() => setActiveTab('utilities')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-right cursor-pointer ${
@@ -353,7 +557,7 @@ function AppContent() {
         {/* C. HEADER */}
 
         {/* C1. Desktop Main Header (Hidden on Mobile) */}
-        <header className="h-18 bg-white border-b border-slate-200 hidden md:flex items-center justify-between px-8 shrink-0 relative z-10">
+        <header className="h-18 bg-white border-b border-slate-200 hidden md:flex items-center justify-between px-8 shrink-0 relative z-10 transition-colors">
           <div className="flex items-center gap-3">
             <h2 className="text-md font-extrabold text-slate-900 tracking-tight">
               {activeTab === 'dashboard' && 'نظرة عامة على البيانات والتحليلات'}
@@ -390,16 +594,14 @@ function AppContent() {
         </header>
 
         {/* C2. Mobile Brand Header (Hidden on Desktop) */}
-        <header className="bg-white border-b border-slate-100 shadow-2xs shrink-0 block md:hidden relative z-20">
+        <header className="bg-white border-b border-slate-100 shadow-2xs shrink-0 block md:hidden relative z-20 transition-colors">
           <div className="px-4 py-4 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-radial-at-t from-sky-900 to-sky-950 border border-amber-500/35 rounded-xl flex items-center justify-center text-white font-bold shadow shadow-amber-100 shrink-0">
-                  🌾
-                </div>
+                {renderVisualIdentity('sm')}
                 <div>
-                  <h1 className="text-xs font-black text-slate-800 leading-none">مجموعة كنعان الذكية</h1>
-                  <p className="text-[9px] text-amber-600 font-bold mt-1">حساب المندوب: {user.email}</p>
+                  <h1 className="text-xs font-black text-slate-800 leading-none truncate max-w-[140px]">{businessName}</h1>
+                  <p className="text-[9px] text-amber-600 font-bold mt-1">{translateRole(profile?.role)}: {profile?.delegateName || user.email}</p>
                 </div>
               </div>
               
@@ -464,6 +666,18 @@ function AppContent() {
               >
                 التذكيرات AI
               </button>
+              {showTeamTab && (
+                <button
+                  onClick={() => setActiveTab('team')}
+                  className={`py-2 px-3 rounded-lg text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
+                    activeTab === 'team'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  فريق العمل
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab('utilities')}
                 className={`py-2 px-3 rounded-lg text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
@@ -515,6 +729,10 @@ function AppContent() {
                 />
               )}
 
+              {activeTab === 'team' && (
+                <TeamTab />
+              )}
+
               {activeTab === 'utilities' && (
                 <UtilitiesTab
                   onRefresh={() => {}}
@@ -527,9 +745,9 @@ function AppContent() {
         </main>
 
         {/* E. FOOTER */}
-        <footer className="bg-white border-t border-slate-100 text-center py-4 text-slate-400 text-[10px] shrink-0 font-medium space-y-1">
-          <p>كنعان لتوزيع المواد الغذائية والمشروبات © ٢٠٢٦ | المندوب عبدالرحمن كنعان 🌾 هاتف: 0958280936</p>
-          <p className="text-[9px] text-slate-350">حقوق الحسابات والنظام مطورة ومحفوظة بالكامل لسلسلة التوزيع البرية</p>
+        <footer className="bg-white border-t border-slate-100 text-center py-4 text-slate-400 text-[10px] shrink-0 font-medium space-y-1 transition-colors">
+          <p>{businessName} {businessDesc ? `ـ ${businessDesc}` : 'لتوزيع الأغذية والمشروبات'} © ٢٠٢٦ | المندوب {profile?.delegateName || 'عبدالرحمن كنعان'} | {profile?.phone ? `هاتف: ${profile.phone}` : 'هاتف: 0958280936'}</p>
+          <p className="text-[9px] text-slate-350">{copyrightText}</p>
         </footer>
 
       </div>
@@ -549,13 +767,19 @@ function AppContent() {
         onSave={handleSaveCustomer}
       />
 
-      <TransactionModal
-        isOpen={isTxModalOpen}
-        onClose={() => setIsTxModalOpen(false)}
+      <TransactionModal 
+        isOpen={isTxModalOpen} 
+        onClose={() => {
+          setIsTxModalOpen(false);
+          setTxInitialAmount(undefined);
+          setTxInitialNotes(undefined);
+        }}
         customers={db.customers}
         customerId={txCustomerId}
         customerName={txCustomerName}
         type={txType}
+        initialAmount={txInitialAmount}
+        initialNotes={txInitialNotes}
         onSave={handleSaveTransaction}
       />
 

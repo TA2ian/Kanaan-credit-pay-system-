@@ -27,7 +27,7 @@ export function BaseModal({ isOpen, onClose, title, children }: BaseModalProps) 
           
           {/* Modal Container */}
           <motion.div 
-            className="bg-white rounded-2xl w-full max-w-lg shadow-2xl relative z-10 overflow-hidden" 
+            className="bg-white rounded-2xl w-full max-w-lg shadow-2xl relative z-10 overflow-hidden border border-slate-100 transition-colors" 
             dir="rtl"
             initial={{ scale: 0.95, y: 15, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
@@ -35,7 +35,7 @@ export function BaseModal({ isOpen, onClose, title, children }: BaseModalProps) 
             style={{ willChange: 'transform, opacity' }}
             transition={{ type: "spring", duration: 0.4, bounce: 0.15 }}
           >
-            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50 transition-colors">
               <h2 className="font-bold text-lg text-slate-800">{title}</h2>
               <button 
                 onClick={onClose} 

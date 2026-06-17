@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Customer, Transaction, CustomerBalance } from '../lib/db';
 import { formatCurrency, formatPhoneNumberForUrl } from '../lib/utils';
 import { usePopup } from '../lib/PopupContext';
+import { useFirebase } from '../lib/FirebaseContext';
 import { ArrowRight, Share2, Loader2 } from 'lucide-react';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
@@ -9,16 +10,39 @@ import html2pdf from 'html2pdf.js';
 interface PrintStatementTemplateProps {
   balance: CustomerBalance;
   transactions: Transaction[];
+  archivedTransactions: Transaction[];
   reminder: string;
   onClose?: () => void;
+  hidePayments?: boolean;
+  hideWithdrawals?: boolean;
 }
 
-export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ balance, transactions, reminder, onClose }) => {
+export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ 
+  balance, 
+  transactions, 
+  archivedTransactions, 
+  reminder, 
+  onClose,
+  hidePayments = false,
+  hideWithdrawals = false
+}) => {
   const { customer, totalDebt, totalPaid, remainingDebt } = balance;
+  const totalArchived = archivedTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+  const { profile } = useFirebase();
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const { showAlert } = usePopup();
+
+  // Filter local transactions based on props
+  const filteredTransactions = transactions.filter(tx => {
+    if (hidePayments && tx.type === 'payment') return false;
+    if (hideWithdrawals && tx.type === 'debt') return false;
+    return true;
+  });
+
+  const filteredTotalDebt = filteredTransactions.filter(t => t.type === 'debt').reduce((sum, t) => sum + t.amount, 0);
+  const filteredTotalPaid = filteredTransactions.filter(t => t.type === 'payment').reduce((sum, t) => sum + t.amount, 0);
 
   useEffect(() => {
     const savedLogo = localStorage.getItem('company_logo');
@@ -63,7 +87,12 @@ export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ 
   const sendWhatsApp = async () => {
     if (isGenerating) return;
     setIsGenerating(true);
-    const text = `💼 *كشف مالي معتمد - مجموعة كنعان الذكية* 🧾\n*العميل الكريم:* ${customer.name}\n*المنطقة / البلد:* ${customer.region || 'غير محددة'}\n*جوال:* ${customer.phone}\n-------------------------------------\n• الرصيد المطلوب كلياً ذمة: *$${remainingDebt.toLocaleString()}*\n• إجمالي المسحوبات (الدين): *$${totalDebt.toLocaleString()}*\n• إجمالي المدفوع الموثق: *$${totalPaid.toLocaleString()}*\n-------------------------------------\nأخوكم عبدالرحمن كنعان لتوزيع الأغذية والمشروبات 🌾\nللاستعلام والطلب: 0958280936 📞${reminder ? `\n\nملاحظة: ${reminder}` : ''}`;
+
+    const busName = profile?.businessName || 'مجموعة كنعان الذكية';
+    const delName = profile?.delegateName || 'عبدالرحمن كنعان';
+    const delPhone = profile?.phone || '0958280936';
+
+    const text = `💼 *كشف مالي معتمد - ${busName}* 🧾\n*العميل الكريم:* ${customer.name}\n*المنطقة / البلد:* ${customer.region || 'غير محددة'}\n*جوال:* ${customer.phone}\n-------------------------------------\n• الرصيد المطلوب كلياً ذمة: *${formatCurrency(remainingDebt)}*\n• إجمالي المسحوبات (الدين): *${formatCurrency(totalDebt)}*\n• إجمالي المدفوع الموثق: *${formatCurrency(totalPaid)}*\n-------------------------------------\nأخوكم ${delName} لتوزيع الأغذية والمشروبات 🌾\nللاستعلام والطلب: ${delPhone} 📞${reminder ? `\n\nملاحظة: ${reminder}` : ''}`;
     
     try {
       const pdfBlob = await generatePdfBlob();
@@ -131,7 +160,7 @@ export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ 
         
         <button type="button" onClick={sendWhatsApp} disabled={isGenerating} className={`flex items-center gap-2 ${isGenerating ? 'bg-emerald-400' : 'bg-emerald-600 hover:bg-emerald-700'} text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-sm cursor-pointer transition mr-auto`}>
           {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
-          {isGenerating ? "جاري التجهيز..." : "إرسال عبر واتساب"}
+          {isGenerating ? "جاري التجهيز..." : "تصدير أو إرسال عبر واتساب"}
         </button>
       </div>
 
@@ -142,9 +171,9 @@ export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ 
         <div className="grid grid-cols-3 items-center gap-2 mb-4 sm:mb-6 w-full">
           {/* Right Section: Company details */}
           <div className="text-right">
-            <h1 className="text-base sm:text-2xl font-black mb-0.5 leading-tight" style={{ color: '#1e40af' }}>كنعان</h1>
-            <p className="text-[10px] sm:text-sm font-bold leading-tight" style={{ color: '#f97316' }}>مندوب مواد غذائية ومشروبات</p>
-            <p className="text-[10px] sm:text-sm font-semibold mt-1 text-right" dir="ltr" style={{ color: '#1e293b' }}>0958280936</p>
+            <h1 className="text-base sm:text-2xl font-black mb-0.5 leading-tight" style={{ color: '#1e40af' }}>{profile?.businessName || 'مجموعة كنعان'}</h1>
+            <p className="text-[10px] sm:text-sm font-bold leading-tight" style={{ color: '#f97316' }}>{profile?.businessDesc || 'لتوزيع الأغذية والمشروبات والخدمات'}</p>
+            <p className="text-[10px] sm:text-sm font-semibold mt-1 text-right" dir="ltr" style={{ color: '#1e293b' }}>{profile?.phone || '0958280936'}</p>
           </div>
           
           {/* Middle Section: Statement information */}
@@ -167,78 +196,94 @@ export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ 
         </div>
         <div className="border-b-4 mb-4 sm:mb-6 w-full" style={{ borderColor: '#1e40af' }}></div>
 
-      {/* Summary Cards */}
-      <div className={`grid grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-6 w-full`}>
+        {/* Summary Cards */}
+      <div className={`grid grid-cols-${(!hidePayments && !hideWithdrawals) ? '3' : '2'} gap-2 sm:gap-3 mb-4 sm:mb-6 w-full`}>
         <div className={`p-2 rounded-lg flex flex-col justify-center min-h-[55px] sm:min-h-[65px]`} style={{ backgroundColor: '#ffffff', borderColor: '#fda4af', borderWidth: 1 }}>
           <p className={`text-[10px] sm:text-xs font-bold mb-1 flex items-center justify-center gap-1`} style={{ color: '#64748b' }}>الرصيد المستحق</p>
           <p className={`text-xs sm:text-lg font-black text-center`} style={{ color: '#e11d48' }}>{formatCurrency(remainingDebt)}</p>
           <p className={`text-center text-[9px] sm:text-[10px] font-bold mt-0.5`} style={{ color: '#475569' }}>⏳ مستحق</p>
         </div>
-        <div className={`p-2 rounded-lg flex flex-col justify-center min-h-[55px] sm:min-h-[65px]`} style={{ backgroundColor: '#ffffff', borderColor: '#6ee7b7', borderWidth: 1 }}>
-          <p className={`text-[10px] sm:text-xs font-bold mb-1 text-center`} style={{ color: '#64748b' }}>إجمالي المسدّد</p>
-          <p className={`text-xs sm:text-lg font-black text-center`} style={{ color: '#059669' }}>{formatCurrency(totalPaid)}</p>
-          <p className={`text-center text-[9px] sm:text-[10px] font-bold mt-0.5`} style={{ color: '#64748b' }}>{transactions.filter(t => t.type === 'payment').length} دفعة</p>
-        </div>
-        <div className={`p-2 rounded-lg flex flex-col justify-center min-h-[55px] sm:min-h-[65px]`} style={{ backgroundColor: '#ffffff', borderColor: '#bfdbfe', borderWidth: 1 }}>
-          <p className={`text-[10px] sm:text-xs font-bold mb-1 text-center`} style={{ color: '#64748b' }}>إجمالي البضاعة</p>
-          <p className={`text-xs sm:text-lg font-black text-center`} style={{ color: '#1e40af' }}>{formatCurrency(totalDebt)}</p>
-          <p className={`text-center text-[9px] sm:text-[10px] font-bold mt-0.5`} style={{ color: '#64748b' }}>{transactions.filter(t => t.type === 'debt').length} تسليم</p>
-        </div>
+        
+        {!hidePayments && (
+          <div className={`p-2 rounded-lg flex flex-col justify-center min-h-[55px] sm:min-h-[65px]`} style={{ backgroundColor: '#ffffff', borderColor: '#6ee7b7', borderWidth: 1 }}>
+            <p className={`text-[10px] sm:text-xs font-bold mb-1 text-center`} style={{ color: '#64748b' }}>إجمالي المدفوع الموثق</p>
+            <p className={`text-xs sm:text-lg font-black text-center`} style={{ color: '#059669' }}>{formatCurrency(totalPaid)}</p>
+            <p className={`text-center text-[9px] sm:text-[10px] font-bold mt-0.5`} style={{ color: '#64748b' }}>{transactions.filter(t => t.type === 'payment').length} دفعة</p>
+          </div>
+        )}
+
+        {!hideWithdrawals && (
+          <div className={`p-2 rounded-lg flex flex-col justify-center min-h-[55px] sm:min-h-[65px]`} style={{ backgroundColor: '#ffffff', borderColor: '#bfdbfe', borderWidth: 1 }}>
+            <p className={`text-[10px] sm:text-xs font-bold mb-1 text-center`} style={{ color: '#64748b' }}>إجمالي البضاعة</p>
+            <p className={`text-xs sm:text-lg font-black text-center`} style={{ color: '#1e40af' }}>{formatCurrency(totalDebt + totalArchived)}</p>
+            <p className={`text-center text-[9px] sm:text-[10px] font-bold mt-0.5`} style={{ color: '#64748b' }}>{transactions.filter(t => t.type === 'debt').length + archivedTransactions.length} تسليم</p>
+          </div>
+        )}
       </div>
+      
+      {archivedTransactions.length > 0 && (
+         <div className="mb-6 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs sm:text-sm text-center">
+            تتضمن حساباتكم {archivedTransactions.length} عملية مؤرشفة (مدفوعة بالكامل) بقيمة إجمالية: {formatCurrency(totalArchived)}
+         </div>
+      )}
 
       {/* Transactions */}
       <div className={`space-y-6 sm:space-y-8 mb-6 sm:mb-8`}>
-        <section>
-          <h3 className={`text-base sm:text-lg font-bold mb-2 flex items-center gap-2`} style={{ color: '#1e40af' }}>🚚 التسليمات</h3>
-          <table className={`w-full text-right text-xs sm:text-sm border-collapse`}>
-            <thead>
-              <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
-                <th className={`py-2 font-bold w-1/3`} style={{ color: '#1e40af' }}>التاريخ</th>
-                <th className={`py-2 font-bold w-1/3 text-center`} style={{ color: '#1e40af' }}>البيان</th>
-                <th className={`py-2 font-bold w-1/3 text-left`} style={{ color: '#1e40af' }}>المبلغ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.filter(tx => tx.type === 'debt').map((tx, i) => (
-                <tr key={i} className="border-b" style={{ borderColor: '#f1f5f9' }}>
-                  <td className={`py-2 sm:py-3`} style={{ color: '#475569' }}>{tx.date}</td>
-                  <td className={`py-2 sm:py-3 text-center truncate max-w-[100px] sm:max-w-none`} style={{ color: '#475569' }}>{tx.notes || '---'}</td>
-                  <td className={`py-2 sm:py-3 font-bold text-left`} dir="ltr" style={{ color: '#1e40af' }}>{formatCurrency(tx.amount)}</td>
+        {!hideWithdrawals && (
+          <section>
+            <h3 className={`text-base sm:text-lg font-bold mb-2 flex items-center gap-2`} style={{ color: '#1e40af' }}>🚚 التسليمات</h3>
+            <table className={`w-full text-right text-xs sm:text-sm border-collapse`}>
+              <thead>
+                <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
+                  <th className={`py-2 font-bold w-1/3`} style={{ color: '#1e40af' }}>التاريخ</th>
+                  <th className={`py-2 font-bold w-1/3 text-center`} style={{ color: '#1e40af' }}>البيان</th>
+                  <th className={`py-2 font-bold w-1/3 text-left`} style={{ color: '#1e40af' }}>المبلغ</th>
                 </tr>
-              ))}
-              <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
-                <td colSpan={2} className={`py-3 sm:py-4 font-black text-center`} style={{ color: '#1e40af' }}>المجموع</td>
-                <td className={`py-3 sm:py-4 font-black text-left`} dir="ltr" style={{ color: '#1e40af' }}>{formatCurrency(totalDebt)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
+              </thead>
+              <tbody>
+                {transactions.filter(tx => tx.type === 'debt').map((tx, i) => (
+                  <tr key={i} className="border-b" style={{ borderColor: '#f1f5f9' }}>
+                    <td className={`py-2 sm:py-3`} style={{ color: '#475569' }}>{tx.date}</td>
+                    <td className={`py-2 sm:py-3 text-center truncate max-w-[100px] sm:max-w-none`} style={{ color: '#475569' }}>{tx.notes || '---'}</td>
+                    <td className={`py-2 sm:py-3 font-bold text-left`} dir="ltr" style={{ color: '#1e40af' }}>{formatCurrency(tx.amount)}</td>
+                  </tr>
+                ))}
+                <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
+                  <td colSpan={2} className={`py-3 sm:py-4 font-black text-center`} style={{ color: '#1e40af' }}>المجموع</td>
+                  <td className={`py-3 sm:py-4 font-black text-left`} dir="ltr" style={{ color: '#1e40af' }}>{formatCurrency(totalDebt)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        )}
 
-        <section>
-          <h3 className={`text-base sm:text-lg font-bold mb-2 flex items-center gap-2`} style={{ color: '#059669' }}>💵 الدفعات</h3>
-          <table className={`w-full text-right text-xs sm:text-sm border-collapse`}>
-            <thead>
-              <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
-                <th className={`py-2 font-bold w-1/3`} style={{ color: '#059669' }}>التاريخ</th>
-                <th className={`py-2 font-bold w-1/3 text-center`} style={{ color: '#059669' }}>ملاحظة</th>
-                <th className={`py-2 font-bold w-1/3 text-left`} style={{ color: '#059669' }}>المبلغ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.filter(tx => tx.type === 'payment').map((tx, i) => (
-                <tr key={i} className="border-b" style={{ borderColor: '#f1f5f9' }}>
-                  <td className={`py-2 sm:py-3`} style={{ color: '#475569' }}>{tx.date}</td>
-                  <td className={`py-2 sm:py-3 text-center truncate max-w-[80px] sm:max-w-none`} style={{ color: '#475569' }}>{tx.notes || '---'}</td>
-                  <td className={`py-2 sm:py-3 font-bold text-left`} dir="ltr" style={{ color: '#059669' }}>{formatCurrency(tx.amount)}</td>
+        {!hidePayments && (
+          <section>
+            <h3 className={`text-base sm:text-lg font-bold mb-2 flex items-center gap-2`} style={{ color: '#059669' }}>💵 الدفعات</h3>
+            <table className={`w-full text-right text-xs sm:text-sm border-collapse`}>
+              <thead>
+                <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
+                  <th className={`py-2 font-bold w-1/3`} style={{ color: '#059669' }}>التاريخ</th>
+                  <th className={`py-2 font-bold w-1/3 text-center`} style={{ color: '#059669' }}>ملاحظة</th>
+                  <th className={`py-2 font-bold w-1/3 text-left`} style={{ color: '#059669' }}>المبلغ</th>
                 </tr>
-              ))}
-              <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
-                <td colSpan={2} className={`py-3 sm:py-4 font-black text-center`} style={{ color: '#059669' }}>المجموع</td>
-                <td className={`py-3 sm:py-4 font-black text-left`} dir="ltr" style={{ color: '#059669' }}>{formatCurrency(totalPaid)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
+              </thead>
+              <tbody>
+                {transactions.filter(tx => tx.type === 'payment').map((tx, i) => (
+                  <tr key={i} className="border-b" style={{ borderColor: '#f1f5f9' }}>
+                    <td className={`py-2 sm:py-3`} style={{ color: '#475569' }}>{tx.date}</td>
+                    <td className={`py-2 sm:py-3 text-center truncate max-w-[80px] sm:max-w-none`} style={{ color: '#475569' }}>{tx.notes || '---'}</td>
+                    <td className={`py-2 sm:py-3 font-bold text-left`} dir="ltr" style={{ color: '#059669' }}>{formatCurrency(tx.amount)}</td>
+                  </tr>
+                ))}
+                <tr className="border-b-2" style={{ borderColor: '#e2e8f0' }}>
+                  <td colSpan={2} className={`py-3 sm:py-4 font-black text-center`} style={{ color: '#059669' }}>المجموع</td>
+                  <td className={`py-3 sm:py-4 font-black text-left`} dir="ltr" style={{ color: '#059669' }}>{formatCurrency(totalPaid)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        )}
       </div>
 
       {/* Final Balance Large Card */}
@@ -260,7 +305,7 @@ export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({ 
 
       {/* Footer */}
       <div className="pt-4 border-t text-center text-xs" style={{ borderColor: '#e2e8f0', color: '#94a3b8' }}>
-         كنعان — مندوب مواد غذائية ومشروبات • {new Date().toLocaleDateString('ar-SA')}
+         {profile?.businessName || 'كنعان للخدمات البرية'} — للتوزيع والخدمات الميدانية المعتمدة • هاتف: {profile?.phone || '0958280936'} • {new Date().toLocaleDateString('ar-SA')}
       </div>
       </div>
       </div>

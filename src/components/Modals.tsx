@@ -4,9 +4,10 @@
  */
 
 import React, { useState } from 'react';
-import { Customer, TransactionType } from '../lib/db';
-import { X, UserPlus, FileSpreadsheet, PlusCircle, Calendar, ShieldCheck, DollarSign, Contact } from 'lucide-react';
+import { Customer, TransactionType, CustomerClassification, Transaction } from '../lib/db';
+import { X, UserPlus, FileSpreadsheet, PlusCircle, Calendar, ShieldCheck, DollarSign, Contact, Archive } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatCurrency } from '../lib/utils';
 
 interface ModalProps {
   isOpen: boolean;
@@ -16,7 +17,7 @@ interface ModalProps {
 // 1. ADD / EDIT CUSTOMER MODAL
 interface CustomerModalProps extends ModalProps {
   customer?: Customer; // If provided, we are in edit mode
-  onSave: (name: string, phone: string, email?: string, notes?: string, region?: string) => void;
+  onSave: (name: string, phone: string, email?: string, notes?: string, region?: string, classification?: CustomerClassification) => void;
 }
 
 export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerModalProps) {
@@ -25,6 +26,7 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
   const [email, setEmail] = useState(customer?.email || '');
   const [notes, setNotes] = useState(customer?.notes || '');
   const [region, setRegion] = useState(customer?.region || '');
+  const [classification, setClassification] = useState<CustomerClassification | undefined>(customer?.classification);
   const [error, setError] = useState('');
 
   React.useEffect(() => {
@@ -34,12 +36,14 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
       setEmail(customer.email || '');
       setNotes(customer.notes || '');
       setRegion(customer.region || '');
+      setClassification(customer.classification);
     } else {
       setName('');
       setPhone('');
       setEmail('');
       setNotes('');
       setRegion('');
+      setClassification(undefined);
     }
     setError('');
   }, [customer, isOpen]);
@@ -89,7 +93,7 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
       setError('يرجى ملء رقم الهاتف الواتساب.');
       return;
     }
-    onSave(name.trim(), phone.trim(), email.trim(), notes.trim(), region.trim());
+    onSave(name.trim(), phone.trim(), email.trim(), notes.trim(), region.trim(), classification);
     onClose();
   };
 
@@ -115,9 +119,9 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
             transition={{ type: "spring", duration: 0.4, bounce: 0.15 }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-emerald-600" />
+            <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <UserPlus className="w-4.5 h-4.5 text-emerald-600" />
                 {customer ? 'تعديل بيانات العميل' : 'إضافة عميل جديد'}
               </h3>
               <button 
@@ -130,9 +134,9 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
             </div>
 
             {/* Content */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
               {error && (
-                <div className="p-3 text-xs font-semibold text-red-600 bg-red-50 rounded-xl border border-red-100">
+                <div className="p-2.5 text-[11px] font-semibold text-red-600 bg-red-50 rounded-xl border border-red-100">
                   {error}
                 </div>
               )}
@@ -141,89 +145,107 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
                 <button
                   type="button"
                   onClick={handlePickContact}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 rounded-xl text-sm font-bold transition-colors mb-2 cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
                   <Contact className="w-4 h-4" />
                   استيراد من جهات الاتصال
                 </button>
               )}
 
-              <div>
-                <label className="block mb-1.5 text-xs font-bold text-slate-700">اسم العميل ثنائي أو ثلاثي *</label>
-                <input
-                  type="text"
-                  placeholder="مثال: خالد بن أحمد الحامد"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
-                  required
-                />
+              <div className="space-y-3.5">
+                <div>
+                  <label className="block mb-1 text-[11px] font-bold text-slate-600">اسم العميل ثنائي أو ثلاثي *</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: خالد بن أحمد الحامد"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block mb-1 text-[11px] font-bold text-slate-600">جوال الواتساب *</label>
+                    <input
+                      type="text"
+                      placeholder="0958280936"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
+                      dir="ltr"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-[11px] font-bold text-slate-600">تصنيف العميل</label>
+                    <select 
+                      value={classification || ''}
+                      onChange={(e) => setClassification(e.target.value as CustomerClassification || undefined)}
+                      className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
+                    >
+                      <option value="">غير مصنف</option>
+                      <option value="distinct">عميل مميز</option>
+                      <option value="struggling">عميل متعثر</option>
+                      <option value="new">عميل جديد</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block mb-1 text-[11px] font-bold text-slate-600">البريد (اختياري)</label>
+                    <input
+                      type="email"
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
+                      dir="ltr"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-[11px] font-bold text-slate-600">المنطقة / الحي</label>
+                    <input
+                      type="text"
+                      placeholder="مثال: الحاضر..."
+                      value={region}
+                      onChange={(e) => setRegion(e.target.value)}
+                      className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block mb-1 text-[11px] font-bold text-slate-600">ملاحظات أو نوع النشاط</label>
+                  <textarea
+                    placeholder="اكتب أي ملاحظات حول العميل..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors resize-none"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block mb-1.5 text-xs font-bold text-slate-700">رقم جوال الواتساب *</label>
-                <input
-                  type="text"
-                  placeholder="مثال: 0958280936 أو 963958280936"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
-                  dir="ltr"
-                  required
-                />
-                <p className="mt-1 text-[10px] text-slate-500">مفضل إدخل رقم الجوال السوري (مثال: 0958280936) وسيقوم النظام بربطه تلقائياً بالرمز الدولي +963.</p>
-              </div>
-
-              <div>
-                <label className="block mb-1.5 text-xs font-bold text-slate-700">البريد الإلكتروني (اختياري)</label>
-                <input
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
-                  dir="ltr"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1.5 text-xs font-bold text-slate-700">المنطقة / الحي (مثال: الحاضر، القصور، الجراجمة، طريق حلب، الشريعة)</label>
-                <input
-                  type="text"
-                  placeholder="مثال: الحاضر، القصور..."
-                  value={region}
-                  onChange={(e) => setRegion(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1.5 text-xs font-bold text-slate-700">ملاحظات أو نوع النشاط</label>
-                <textarea
-                  placeholder="اكتب أي ملاحظات حول العميل وموثوقيته أو نوع تعامله المعتاد..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors resize-none"
-                />
-              </div>
-
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-3 pt-1">
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 px-4 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl focus:ring-4 focus:ring-emerald-100 transition-all cursor-pointer"
+                  className="flex-1 py-2 px-4 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer"
                 >
                   حفظ وتأكيد
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 py-2.5 px-4 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                  className="flex-1 py-2 px-4 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
                 >
                   إلغاء
                 </button>
               </div>
             </form>
+
           </motion.div>
         </div>
       )}
@@ -237,27 +259,29 @@ interface TransactionModalProps extends ModalProps {
   customerId?: string; // Optional if selecting from list
   customerName?: string;
   type: TransactionType; // 'debt' (قيد دين) or 'payment' (قيد دفعة مستلمة)
+  initialAmount?: number;
+  initialNotes?: string;
   onSave: (customerId: string, type: TransactionType, amount: number, notes?: string, dueDate?: string) => void;
 }
 
-export function TransactionModal({ isOpen, onClose, customers, customerId, customerName, type, onSave }: TransactionModalProps) {
+export function TransactionModal({ isOpen, onClose, customers, customerId, customerName, type, initialAmount, initialNotes, onSave }: TransactionModalProps) {
   const [selectedCustomerId, setSelectedCustomerId] = useState(customerId || '');
-  const [amount, setAmount] = useState('');
-  const [notes, setNotes] = useState('');
+  const [amount, setAmount] = useState(initialAmount?.toString() || '');
+  const [notes, setNotes] = useState(initialNotes || '');
   const [dueDate, setDueDate] = useState('');
   const [error, setError] = useState('');
 
   React.useEffect(() => {
     setSelectedCustomerId(customerId || '');
-    setAmount('');
-    setNotes('');
+    setAmount(initialAmount?.toString() || '');
+    setNotes(initialNotes || '');
     
     // Default due date to 15 days out
     const defaultDate = new Date();
     defaultDate.setDate(defaultDate.getDate() + 15);
     setDueDate(defaultDate.toISOString().split('T')[0]);
     setError('');
-  }, [isOpen, customerId, type, customers]);
+  }, [isOpen, customerId, type, customers, initialAmount, initialNotes]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

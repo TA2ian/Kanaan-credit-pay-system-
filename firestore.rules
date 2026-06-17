@@ -7,67 +7,118 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Helper functions
+    // Common Helpers
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(ownerId) {
-      return isSignedIn() && request.auth.uid == ownerId;
+    function hasProfile() {
+      return exists(/databases/$(database)/documents/profiles/$(request.auth.uid));
+    }
+
+    function getUserCompanyId() {
+      return hasProfile()
+        ? get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.companyId
+        : request.auth.uid;
+    }
+
+    function getUserRole() {
+      return hasProfile()
+        ? get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role
+        : 'manager';
     }
 
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    // 1. CUSTOMERS Rules Block
+    // 1. PROFILES Rules Block
+    match /profiles/{userId} {
+      allow read: if isSignedIn() 
+        && (request.auth.uid == userId || (resource != null && getUserCompanyId() == resource.data.companyId));
+      
+      // Let anyone create their profile record upon signing up
+      allow create: if isSignedIn() 
+        && request.auth.uid == userId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.businessName is string
+        && request.resource.data.businessName.size() > 0
+        && request.resource.data.businessName.size() <= 200
+        && request.resource.data.businessType in ['solo', 'company']
+        && request.resource.data.role in ['manager', 'assistant', 'accountant', 'representative'];
+        
+      allow update: if isSignedIn() 
+        && request.auth.uid == userId
+        && request.resource.data.userId == request.auth.uid
+        && (getUserRole() in ['manager', 'assistant'] || request.resource.data.role == resource.data.role); // Only managers can elevate roles
+
+      allow delete: if isSignedIn()
+        && getUserRole() in ['manager', 'assistant']
+        && getUserCompanyId() == resource.data.companyId
+        && request.auth.uid != userId;
+    }
+
+    // 2. INVITATIONS Rules Block
+    match /invitations/{invitationId} {
+      // Users can see their invitations matching their verified email
+      allow read: if isSignedIn() 
+        && (resource.data.email == request.auth.token.email 
+            || getUserCompanyId() == resource.data.companyId);
+            
+      // Only managers/assistants can create or delete invitations
+      allow create: if isSignedIn() 
+        && getUserRole() in ['manager', 'assistant']
+        && request.resource.data.companyId == getUserCompanyId()
+        && request.resource.data.email is string
+        && request.resource.data.role in ['manager', 'assistant', 'accountant', 'representative'];
+        
+      allow delete: if isSignedIn() 
+        && (request.auth.token.email == resource.data.email 
+            || getUserRole() in ['manager', 'assistant']);
+    }
+
+    // 3. CUSTOMERS Rules Block
     match /customers/{customerId} {
-      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow read: if isSignedIn() && (getUserCompanyId() == resource.data.companyId || (resource.data.companyId == null && resource.data.creatorId == request.auth.uid));
       
       allow create: if isSignedIn() 
         && isValidId(customerId)
-        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.companyId == getUserCompanyId()
         && request.resource.data.name is string 
         && request.resource.data.name.size() > 0 
-        && request.resource.data.name.size() <= 200
-        && request.resource.data.phone is string 
-        && request.resource.data.phone.size() <= 32;
+        && request.resource.data.name.size() <= 200;
 
       allow update: if isSignedIn() 
-        && resource.data.ownerId == request.auth.uid
-        && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.name is string 
-        && request.resource.data.name.size() > 0 
-        && request.resource.data.name.size() <= 200
-        && request.resource.data.phone is string 
-        && request.resource.data.phone.size() <= 32;
+        && getUserCompanyId() == resource.data.companyId
+        && getUserRole() in ['manager', 'assistant', 'accountant']
+        && request.resource.data.companyId == getUserCompanyId();
 
-      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow delete: if isSignedIn() 
+        && getUserCompanyId() == resource.data.companyId
+        && getUserRole() in ['manager', 'assistant'];
     }
 
-    // 2. TRANSACTIONS Rules Block
+    // 4. TRANSACTIONS Rules Block
     match /transactions/{transactionId} {
-      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow read: if isSignedIn() && (getUserCompanyId() == resource.data.companyId || (resource.data.companyId == null && resource.data.creatorId == request.auth.uid));
 
       allow create: if isSignedIn() 
         && isValidId(transactionId)
-        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.companyId == getUserCompanyId()
         && request.resource.data.customerId is string
         && request.resource.data.type in ['debt', 'payment']
         && request.resource.data.amount is number
-        && request.resource.data.amount >= 0
-        && request.resource.data.date is string;
+        && request.resource.data.amount >= 0;
 
       allow update: if isSignedIn() 
-        && resource.data.ownerId == request.auth.uid
-        && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.customerId is string
-        && request.resource.data.type in ['debt', 'payment']
-        && request.resource.data.amount is number
-        && request.resource.data.amount >= 0
-        && request.resource.data.date is string;
+        && getUserCompanyId() == resource.data.companyId
+        && getUserRole() in ['manager', 'assistant', 'accountant']
+        && request.resource.data.companyId == getUserCompanyId();
 
-      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow delete: if isSignedIn() 
+        && getUserCompanyId() == resource.data.companyId
+        && getUserRole() in ['manager', 'assistant'];
     }
   }
 }

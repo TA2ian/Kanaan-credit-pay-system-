@@ -88,13 +88,13 @@ export function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4" dir="rtl">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 transition-colors duration-300" dir="rtl">
       <motion.div 
         initial={{ opacity: 0, y: 25, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", duration: 0.55, bounce: 0.12 }}
         style={{ willChange: 'transform, opacity' }}
-        className="w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden flex flex-col"
+        className="w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden flex flex-col transition-colors duration-300"
       >
         
         {/* Decorative Top Branding */}
@@ -103,7 +103,7 @@ export function LoginScreen() {
             شريك كنعان الموثوق 🌾
           </div>
           
-          <div className="mx-auto w-16 h-16 bg-white rounded-full flex items-center justify-center mb-3 shadow-lg border-2 border-amber-400 p-1 relative">
+          <div className="mx-auto w-16 h-16 bg-white rounded-full flex items-center justify-center mb-3 shadow-lg border-2 border-amber-400 p-1 relative transition-colors">
             <div className="absolute inset-0.5 rounded-full border border-dashed border-emerald-500"></div>
             <span className="text-3xl relative z-10">🚚</span>
           </div>
@@ -118,14 +118,14 @@ export function LoginScreen() {
           
           {/* Progress / Status Messages */}
           {error && (
-            <div className="p-3 bg-red-50 text-red-800 border border-red-200 rounded-xl text-xs font-bold flex items-center gap-2">
+            <div className="p-3 bg-red-50 text-red-800 border border-red-200 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors">
               <AlertTriangle className="w-4.5 h-4.5 text-red-600 shrink-0" />
               <p className="leading-relaxed">{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="p-3 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-2">
+            <div className="p-3 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors">
               <CheckCircle2 className="w-4.5 h-4.5 text-indigo-600 shrink-0" />
               <p className="leading-relaxed">{success}</p>
             </div>
@@ -134,7 +134,7 @@ export function LoginScreen() {
           <form onSubmit={handleAuth} className="space-y-4">
             
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">بريدك الإلكتروني (التاجر)</label>
+              <label className="text-xs font-bold text-slate-700 block transition-colors">بريدك الإلكتروني (التاجر)</label>
               <div className="relative">
                 <input
                   type="email"
@@ -142,20 +142,20 @@ export function LoginScreen() {
                   placeholder="merchant@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all text-left"
+                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all text-left shadow-sm"
                 />
-                <Mail className="w-4 h-4 text-slate-450 absolute inset-y-0 right-3.5 my-auto" />
+                <Mail className="w-4 h-4 text-slate-450 absolute inset-y-0 right-3.5 my-auto transition-colors" />
               </div>
             </div>
 
             <div className="space-y-1">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-bold text-slate-700">كلمة المرور الحامية</label>
+                <label className="text-xs font-bold text-slate-700 transition-colors">كلمة المرور الحامية</label>
                 {!isSignUp && (
                   <button 
                     type="button" 
                     onClick={handleResetPassword}
-                    className="text-[10px] text-indigo-600 font-bold hover:underline"
+                    className="text-[10px] text-indigo-600 font-bold hover:underline cursor-pointer"
                   >
                     نسيت كلمة المرور؟
                   </button>
@@ -168,9 +168,9 @@ export function LoginScreen() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all text-left"
+                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all text-left shadow-sm"
                 />
-                <Lock className="w-4 h-4 text-slate-450 absolute inset-y-0 right-3.5 my-auto" />
+                <Lock className="w-4 h-4 text-slate-450 absolute inset-y-0 right-3.5 my-auto transition-colors" />
               </div>
             </div>
 
@@ -187,15 +187,15 @@ export function LoginScreen() {
 
           {/* Social login / standard partition divider */}
           <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-slate-150"></div>
-            <span className="flex-shrink mx-3 text-[10px] text-slate-400 font-bold uppercase">أو الدخول عبر الحسابات المرتبطة</span>
-            <div className="flex-grow border-t border-slate-150"></div>
+            <div className="flex-grow border-t border-slate-150 transition-colors"></div>
+            <span className="flex-shrink mx-3 text-[10px] text-slate-400 font-bold uppercase transition-colors">أو الدخول عبر الحسابات المرتبطة</span>
+            <div className="flex-grow border-t border-slate-150 transition-colors"></div>
           </div>
 
           <button
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:bg-slate-100"
+            className="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:bg-slate-100 shadow-sm"
           >
             <Chrome className="w-4.5 h-4.5 text-rose-500" />
             الدخول الآمن بكبسة زر بـ Google
@@ -219,7 +219,7 @@ export function LoginScreen() {
         </div>
 
         {/* Fine-print notice for premium Merchants */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 text-center text-[10px] text-slate-400 font-semibold leading-relaxed shrink-0">
+        <div className="p-4 bg-slate-50 border-t border-slate-100 text-center text-[10px] text-slate-400 font-semibold leading-relaxed shrink-0 transition-colors">
           * يتم تشفير وإرسال كلمات المرور والحسابات بطبقة تشفير معيارية SSL كاملة مباشرة لخوادم Google Firebase دون تخزين وسيط.
         </div>
 

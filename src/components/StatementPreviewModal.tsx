@@ -11,9 +11,20 @@ interface StatementPreviewModalProps {
   onClose: () => void;
   balance: CustomerBalance;
   transactions: Transaction[];
+  archivedTransactions: Transaction[];
+  hidePayments?: boolean;
+  hideWithdrawals?: boolean;
 }
 
-export function StatementPreviewModal({ isOpen, onClose, balance, transactions }: StatementPreviewModalProps) {
+export function StatementPreviewModal({ 
+  isOpen, 
+  onClose, 
+  balance, 
+  transactions, 
+  archivedTransactions,
+  hidePayments = false,
+  hideWithdrawals = false
+}: StatementPreviewModalProps) {
   const [includeReminder, setIncludeReminder] = useState(false);
   const [aiReminder, setAiReminder] = useState('');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
@@ -51,7 +62,15 @@ export function StatementPreviewModal({ isOpen, onClose, balance, transactions }
     const content = (
       <div id="print-overlay" className="fixed inset-0 z-[100] bg-slate-100 overflow-y-auto flex flex-col items-center justify-start print:static print:h-auto print:overflow-visible print:bg-white print:p-0 print:m-0" dir="rtl">
         <div className="w-full max-w-3xl px-2 sm:px-4 flex-1 pb-8 print:p-0 print:max-w-none print:w-full print:block">
-          <PrintStatementTemplate balance={balance} transactions={transactions} reminder={includeReminder ? aiReminder : ''} onClose={() => setIsPrintView(false)} />
+          <PrintStatementTemplate 
+            balance={balance} 
+            transactions={transactions} 
+            archivedTransactions={archivedTransactions} 
+            reminder={includeReminder ? aiReminder : ''} 
+            onClose={() => setIsPrintView(false)} 
+            hidePayments={hidePayments}
+            hideWithdrawals={hideWithdrawals}
+          />
         </div>
       </div>
     );

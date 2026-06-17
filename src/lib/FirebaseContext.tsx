@@ -20,13 +20,15 @@ import {
   where, 
   onSnapshot, 
   doc, 
+  getDoc,
+  getDocs,
   setDoc, 
   updateDoc, 
   deleteDoc,
   writeBatch
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { Customer, Transaction, TransactionType } from './db';
+import { Customer, Transaction, TransactionType, CustomerClassification } from './db';
 
 export enum OperationType {
   CREATE = 'create',
@@ -67,9 +69,38 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+export interface UserProfile {
+  userId: string;
+  email: string;
+  businessName: string;
+  businessType: 'solo' | 'company';
+  role: 'manager' | 'assistant' | 'accountant' | 'representative';
+  companyId: string;
+  phone?: string;
+  delegateName?: string;
+  createdAt: string;
+  businessEmoji?: string;
+  businessDesc?: string;
+  copyrightText?: string;
+}
+
+export interface TeamInvitation {
+  id: string;
+  email: string;
+  companyId: string;
+  businessName: string;
+  role: 'manager' | 'assistant' | 'accountant' | 'representative';
+  invitedBy: string;
+  createdAt: string;
+}
+
 interface FirebaseContextType {
   user: User | null;
   loading: boolean;
+  profile: UserProfile | null;
+  profileLoading: boolean;
+  teamMembers: UserProfile[];
+  pendingInvitations: TeamInvitation[];
   customers: Customer[];
   transactions: Transaction[];
   signInWithGoogle: () => Promise<void>;
@@ -77,11 +108,24 @@ interface FirebaseContextType {
   signUpWithEmail: (email: string, pass: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logOut: () => Promise<void>;
+  createBusinessProfile: (
+    businessName: string, 
+    businessType: 'solo' | 'company', 
+    role: 'manager' | 'assistant' | 'accountant' | 'representative', 
+    phone?: string, 
+    delegateName?: string,
+    businessEmoji?: string
+  ) => Promise<void>;
+  updateBusinessProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  inviteTeamMember: (email: string, role: 'manager' | 'assistant' | 'accountant' | 'representative') => Promise<void>;
+  deleteTeamMemberProfile: (memberId: string) => Promise<void>;
+  cancelInvitation: (invitationId: string) => Promise<void>;
   addCustomerToFS: (name: string, phone: string, email?: string, notes?: string, region?: string) => Promise<void>;
   updateCustomerInFS: (id: string, name: string, phone: string, email?: string, notes?: string, region?: string) => Promise<void>;
   deleteCustomerFromFS: (id: string) => Promise<void>;
   addTransactionToFS: (customerId: string, type: TransactionType, amount: number, notes?: string, dueDate?: string) => Promise<void>;
   deleteTransactionFromFS: (txId: string) => Promise<void>;
+  archiveTransactionsInFS: (ids: string[], isArchived?: boolean) => Promise<void>;
   importBackupToFS: (backupCustomers: Customer[], backupTransactions: Transaction[]) => Promise<void>;
   wipeAllInFS: () => Promise<void>;
 }
@@ -99,6 +143,12 @@ export function useFirebase() {
 export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [teamMembers, setTeamMembers] = useState<UserProfile[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<TeamInvitation[]>([]);
+  
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
@@ -108,6 +158,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
       setLoading(false);
       if (!currentUser) {
+        setProfile(null);
+        setProfileLoading(false);
+        setTeamMembers([]);
+        setPendingInvitations([]);
         setCustomers([]);
         setTransactions([]);
       }
@@ -115,12 +169,100 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  // 2. Real-time Firestore Synchronizers (Synced based on Auth UID)
+  // 2. Fetch User Profile & Handle Invitations
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setProfile(null);
+      setProfileLoading(false);
+      return;
+    }
 
-    // A. Listen to Customers
-    const qCustomers = query(collection(db, 'customers'), where('ownerId', '==', user.uid));
+    setProfileLoading(true);
+    const profileRef = doc(db, 'profiles', user.uid);
+    
+    const unsubProfile = onSnapshot(profileRef, async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setProfile({
+          userId: user.uid,
+          email: data.email || user.email || '',
+          businessName: data.businessName || 'مجموعة كنعان الذكية',
+          businessType: data.businessType || 'solo',
+          role: data.role || 'manager',
+          companyId: data.companyId || user.uid,
+          phone: data.phone || '',
+          delegateName: data.delegateName || '',
+          createdAt: data.createdAt || new Date().toISOString(),
+          businessEmoji: data.businessEmoji || '🌾',
+          businessDesc: data.businessDesc || '',
+          copyrightText: data.copyrightText || ''
+        });
+        setProfileLoading(false);
+      } else {
+        // Check if there is an active invitation for this user's email
+        const userEmail = user.email?.toLowerCase().trim();
+        if (userEmail) {
+          try {
+            const inviteQuery = query(collection(db, 'invitations'), where('email', '==', userEmail));
+            const inviteSnap = await getDocs(inviteQuery);
+            if (!inviteSnap.empty) {
+              const inviteDoc = inviteSnap.docs[0];
+              const inviteData = inviteDoc.data();
+              
+              // Automatically accept invitation and create UserProfile
+              const newProfile: UserProfile = {
+                userId: user.uid,
+                email: userEmail,
+                businessName: inviteData.businessName || 'مجموعة كنعان الذكية',
+                businessType: 'company',
+                role: inviteData.role || 'representative',
+                companyId: inviteData.companyId,
+                phone: '',
+                delegateName: user.displayName || userEmail.split('@')[0],
+                createdAt: new Date().toISOString(),
+                businessEmoji: inviteData.businessEmoji || '🌾',
+                businessDesc: inviteData.businessDesc || '',
+                copyrightText: inviteData.copyrightText || ''
+              };
+              
+              const batch = writeBatch(db);
+              batch.set(doc(db, 'profiles', user.uid), newProfile);
+              batch.delete(doc(db, 'invitations', inviteDoc.id));
+              await batch.commit();
+              
+              setProfile(newProfile);
+              setProfileLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.error('Error scanning user invitations on signup:', e);
+          }
+        }
+        setProfile(null);
+        setProfileLoading(false);
+      }
+    }, (error) => {
+      console.error('Profile stream error:', error);
+      setProfileLoading(false);
+    });
+
+    return () => unsubProfile();
+  }, [user]);
+
+  // 3. Real-time Listeners for Company Data (Scoped by profile.companyId)
+  useEffect(() => {
+    if (!user || !profile) {
+      setCustomers([]);
+      setTransactions([]);
+      setTeamMembers([]);
+      setPendingInvitations([]);
+      return;
+    }
+
+    const compId = profile.companyId;
+
+    // A. Listen to Customers representing the Company
+    const qCustomers = query(collection(db, 'customers'), where('companyId', '==', compId));
     const unsubCustomers = onSnapshot(qCustomers, (snapshot) => {
       const items: Customer[] = [];
       snapshot.forEach((docSnap) => {
@@ -133,7 +275,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           notes: d.notes || undefined,
           totalDebt: d.totalDebt || 0,
           region: d.region || 'غير محدد',
-          createdAt: d.createdAt || new Date().toISOString()
+          createdAt: d.createdAt || new Date().toISOString(),
+          classification: d.classification as CustomerClassification | undefined
         });
       });
       setCustomers(items);
@@ -141,8 +284,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       handleFirestoreError(error, OperationType.GET, 'customers');
     });
 
-    // B. Listen to Transactions
-    const qTransactions = query(collection(db, 'transactions'), where('ownerId', '==', user.uid));
+    // B. Listen to Transactions representing the Company
+    const qTransactions = query(collection(db, 'transactions'), where('companyId', '==', compId));
     const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
       const items: Transaction[] = [];
       snapshot.forEach((docSnap) => {
@@ -154,7 +297,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           amount: Number(d.amount || 0),
           date: d.date || '',
           dueDate: d.dueDate || undefined,
-          notes: d.notes || undefined
+          notes: d.notes || undefined,
+          isArchived: d.isArchived || false
         });
       });
       setTransactions(items);
@@ -162,11 +306,60 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       handleFirestoreError(error, OperationType.GET, 'transactions');
     });
 
+    // C. Listen to Team Members of the same company
+    const qTeam = query(collection(db, 'profiles'), where('companyId', '==', compId));
+    const unsubTeam = onSnapshot(qTeam, (snapshot) => {
+      const items: UserProfile[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        items.push({
+          userId: docSnap.id,
+          email: d.email || '',
+          businessName: d.businessName || '',
+          businessType: d.businessType || 'company',
+          role: d.role || 'representative',
+          companyId: d.companyId || compId,
+          phone: d.phone || '',
+          delegateName: d.delegateName || '',
+          createdAt: d.createdAt || '',
+          businessEmoji: d.businessEmoji || '🌾',
+          businessDesc: d.businessDesc || '',
+          copyrightText: d.copyrightText || ''
+        });
+      });
+      setTeamMembers(items);
+    }, (error) => {
+      console.warn('Unable to listen to team profiles, expected if role is restricted:', error);
+    });
+
+    // D. Listen to Pending Invitations from this company
+    const qInvites = query(collection(db, 'invitations'), where('companyId', '==', compId));
+    const unsubInvites = onSnapshot(qInvites, (snapshot) => {
+      const items: TeamInvitation[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        items.push({
+          id: docSnap.id,
+          email: d.email || '',
+          companyId: d.companyId || compId,
+          businessName: d.businessName || '',
+          role: d.role || 'representative',
+          invitedBy: d.invitedBy || '',
+          createdAt: d.createdAt || ''
+        });
+      });
+      setPendingInvitations(items);
+    }, (error) => {
+      console.warn('Unable to listen to invites:', error);
+    });
+
     return () => {
       unsubCustomers();
       unsubTransactions();
+      unsubTeam();
+      unsubInvites();
     };
-  }, [user]);
+  }, [user, profile]);
 
   // Auth Operations
   const signInWithGoogle = async () => {
@@ -210,20 +403,68 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     await fbSignOut(auth);
   };
 
-  // Firestore Write Operations (Owner-Scoped)
-  const addCustomerToFS = async (name: string, phone: string, email?: string, notes?: string, region?: string) => {
+  // Profile Writing operations
+  const createBusinessProfile = async (
+    businessName: string, 
+    businessType: 'solo' | 'company', 
+    role: 'manager' | 'assistant' | 'accountant' | 'representative', 
+    phone?: string, 
+    delegateName?: string,
+    businessEmoji?: string,
+    themeColor?: string
+  ) => {
     if (!user) return;
-    const path = 'customers';
-    const docId = 'cust-' + Date.now() + Math.random().toString(36).substr(2, 5);
+    const path = 'profiles';
+    const profileData: UserProfile = {
+      userId: user.uid,
+      email: user.email || '',
+      businessName: businessName.trim() || 'مجموعة كنعان الذكية',
+      businessType,
+      role,
+      companyId: user.uid, // Managers/Solos own their workspace id as their user id
+      phone: phone?.trim() || '',
+      delegateName: delegateName?.trim() || user.displayName || user.email?.split('@')[0] || '',
+      createdAt: new Date().toISOString(),
+      businessEmoji: businessEmoji || '🌾'
+    };
+    try {
+      await setDoc(doc(db, path, user.uid), profileData);
+      setProfile(profileData);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, `${path}/${user.uid}`);
+    }
+  };
+
+  const updateBusinessProfile = async (updates: Partial<UserProfile>) => {
+    if (!user || !profile) return;
+    const path = 'profiles';
+    try {
+      // Filter out undefined values to avoid Firestore errors
+      const sanitizedUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([_, v]) => v !== undefined)
+      );
+      await updateDoc(doc(db, path, user.uid), sanitizedUpdates);
+      setProfile({
+        ...profile,
+        ...updates
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `${path}/${user.uid}`);
+    }
+  };
+
+  const inviteTeamMember = async (email: string, role: 'manager' | 'assistant' | 'accountant' | 'representative') => {
+    if (!user || !profile) return;
+    const lowerEmail = email.toLowerCase().trim();
+    const docId = `invite-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const path = 'invitations';
     try {
       await setDoc(doc(db, path, docId), {
-        id: docId,
-        ownerId: user.uid,
-        name: name.trim(),
-        phone: phone.trim(),
-        email: email?.trim() || '',
-        notes: notes?.trim() || '',
-        region: region?.trim() || '',
+        email: lowerEmail,
+        companyId: profile.companyId,
+        businessName: profile.businessName,
+        role,
+        invitedBy: user.email || '',
         createdAt: new Date().toISOString()
       });
     } catch (e) {
@@ -231,8 +472,56 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateCustomerInFS = async (id: string, name: string, phone: string, email?: string, notes?: string, region?: string) => {
-    if (!user) return;
+  const deleteTeamMemberProfile = async (memberId: string) => {
+    if (!user || !profile) return;
+    // Prevent self-deletion of primary manager
+    if (memberId === user.uid) {
+      throw new Error('لا يمكن حذف حسابك كمدير أساسي للنظام.');
+    }
+    const path = 'profiles';
+    try {
+      await deleteDoc(doc(db, path, memberId));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `${path}/${memberId}`);
+    }
+  };
+
+  const cancelInvitation = async (invitationId: string) => {
+    if (!user || !profile) return;
+    const path = 'invitations';
+    try {
+      await deleteDoc(doc(db, path, invitationId));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `${path}/${invitationId}`);
+    }
+  };
+
+  // Firestore Write Operations (Company-Scoped)
+  const addCustomerToFS = async (name: string, phone: string, email?: string, notes?: string, region?: string, classification?: CustomerClassification) => {
+    if (!user || !profile) return;
+    const path = 'customers';
+    const docId = 'cust-' + Date.now() + Math.random().toString(36).substr(2, 5);
+    try {
+      await setDoc(doc(db, path, docId), {
+        id: docId,
+        ownerId: user.uid, // backwards-compatibility
+        companyId: profile.companyId,
+        creatorId: user.uid,
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email?.trim() || '',
+        notes: notes?.trim() || '',
+        region: region?.trim() || '',
+        classification: classification || null,
+        createdAt: new Date().toISOString()
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, `${path}/${docId}`);
+    }
+  };
+
+  const updateCustomerInFS = async (id: string, name: string, phone: string, email?: string, notes?: string, region?: string, classification?: CustomerClassification) => {
+    if (!user || !profile) return;
     const path = 'customers';
     try {
       await updateDoc(doc(db, path, id), {
@@ -240,7 +529,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         phone: phone.trim(),
         email: email?.trim() || '',
         notes: notes?.trim() || '',
-        region: region?.trim() || ''
+        region: region?.trim() || '',
+        classification: classification || null
       });
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `${path}/${id}`);
@@ -248,7 +538,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteCustomerFromFS = async (id: string) => {
-    if (!user) return;
+    if (!user || !profile) return;
     const path = 'customers';
     try {
       // 1. Delete Customer document
@@ -267,13 +557,16 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addTransactionToFS = async (customerId: string, type: TransactionType, amount: number, notes?: string, dueDate?: string) => {
-    if (!user) return;
+    if (!user || !profile) return;
     const path = 'transactions';
     const docId = 'tx-' + Date.now() + Math.random().toString(36).substr(2, 5);
     try {
       await setDoc(doc(db, path, docId), {
         id: docId,
-        ownerId: user.uid,
+        ownerId: user.uid, // backwards-compatibility
+        companyId: profile.companyId,
+        creatorId: user.uid,
+        creatorEmail: user.email || '',
         customerId,
         type,
         amount,
@@ -287,7 +580,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteTransactionFromFS = async (txId: string) => {
-    if (!user) return;
+    if (!user || !profile) return;
     const path = 'transactions';
     try {
       await deleteDoc(doc(db, path, txId));
@@ -296,23 +589,38 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const archiveTransactionsInFS = async (ids: string[], isArchived: boolean = true) => {
+    if (!user || !profile) return;
+    try {
+      const batch = writeBatch(db);
+      ids.forEach(id => {
+        batch.update(doc(db, 'transactions', id), { isArchived });
+      });
+      await batch.commit();
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'archive_transactions');
+    }
+  };
+
   // Utilities: Seed Database or ImportBackup
   const importBackupToFS = async (backupCustomers: Customer[], backupTransactions: Transaction[]) => {
-    if (!user) return;
+    if (!user || !profile) return;
     try {
       const batch = writeBatch(db);
       
-      // Load and scope all backup characters with current UID
       backupCustomers.forEach((c) => {
         const docRef = doc(db, 'customers', c.id);
         batch.set(docRef, {
           id: c.id,
           ownerId: user.uid,
+          companyId: profile.companyId,
+          creatorId: user.uid,
           name: c.name,
           phone: c.phone,
           email: c.email || '',
           notes: c.notes || '',
           region: c.region || '',
+          classification: c.classification || null,
           createdAt: c.createdAt || new Date().toISOString()
         });
       });
@@ -322,12 +630,16 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         batch.set(docRef, {
           id: t.id,
           ownerId: user.uid,
+          companyId: profile.companyId,
+          creatorId: user.uid,
+          creatorEmail: user.email || '',
           customerId: t.customerId,
           type: t.type,
           amount: t.amount,
           date: t.date,
           dueDate: t.dueDate || '',
-          notes: t.notes || ''
+          notes: t.notes || '',
+          isArchived: t.isArchived || false
         });
       });
 
@@ -338,16 +650,24 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const wipeAllInFS = async () => {
-    if (!user) return;
+    if (!user || !profile) return;
     try {
-      const batch = writeBatch(db);
-      customers.forEach((c) => {
-        batch.delete(doc(db, 'customers', c.id));
-      });
-      transactions.forEach((t) => {
-        batch.delete(doc(db, 'transactions', t.id));
-      });
-      await batch.commit();
+      const customersToDelete = [...customers];
+      const transactionsToDelete = [...transactions];
+      
+      const allDeletes = [
+        ...customersToDelete.map(c => ({ path: 'customers', id: c.id })),
+        ...transactionsToDelete.map(t => ({ path: 'transactions', id: t.id }))
+      ];
+
+      for (let i = 0; i < allDeletes.length; i += 500) {
+        const batch = writeBatch(db);
+        const chunk = allDeletes.slice(i, i + 500);
+        chunk.forEach(item => {
+          batch.delete(doc(db, item.path, item.id));
+        });
+        await batch.commit();
+      }
     } catch (e) {
       handleFirestoreError(e, OperationType.DELETE, 'wipe_all');
     }
@@ -357,6 +677,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     <FirebaseContext.Provider value={{
       user,
       loading,
+      profile,
+      profileLoading,
+      teamMembers,
+      pendingInvitations,
       customers,
       transactions,
       signInWithGoogle,
@@ -364,11 +688,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       signUpWithEmail,
       resetPassword,
       logOut,
+      createBusinessProfile,
+      updateBusinessProfile,
+      inviteTeamMember,
+      deleteTeamMemberProfile,
+      cancelInvitation,
       addCustomerToFS,
       updateCustomerInFS,
       deleteCustomerFromFS,
       addTransactionToFS,
       deleteTransactionFromFS,
+      archiveTransactionsInFS,
       importBackupToFS,
       wipeAllInFS
     }}>

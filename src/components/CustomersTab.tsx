@@ -5,6 +5,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { ArchiveAnalysisModal } from './ArchiveAnalysisModal';
 import { 
   DatabaseState, 
   Customer, 
@@ -12,7 +13,8 @@ import {
   getCustomerBalances, 
   CustomerBalance,
   deleteCustomer,
-  deleteTransaction
+  deleteTransaction,
+  saveDatabase
 } from '../lib/db';
 import { useFirebase } from '../lib/FirebaseContext';
 import { formatCurrency, formatDate, formatPhoneNumberForUrl } from '../lib/utils';
@@ -29,6 +31,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   Printer,
+  Archive,
   FileSpreadsheet,
   AlertCircle,
   X,
@@ -36,7 +39,9 @@ import {
   MapPin,
   SlidersHorizontal,
   ArrowUpDown,
-  Send
+  Send,
+  Check,
+  RotateCcw
 } from 'lucide-react';
 import { QuickActionFAB } from './QuickActionFAB';
 import { StatementPreviewModal } from './StatementPreviewModal';
@@ -49,7 +54,7 @@ interface CustomersTabProps {
   selectedCustomerIdInitially: string | null;
   clearInitialSelection: () => void;
   onAddCustomerTrigger: () => void;
-  onAddTransactionTrigger: (customerId: string, type: 'debt' | 'payment') => void;
+  onAddTransactionTrigger: (customerId: string, type: 'debt' | 'payment', amount?: number, notes?: string) => void;
   onEditCustomerTrigger: (customer: Customer) => void;
 }
 
@@ -62,14 +67,29 @@ export function CustomersTab({
   onAddTransactionTrigger,
   onEditCustomerTrigger,
 }: CustomersTabProps) {
-  const { user, deleteCustomerFromFS, deleteTransactionFromFS } = useFirebase();
+  const { user, profile, deleteCustomerFromFS, deleteTransactionFromFS, archiveTransactionsInFS } = useFirebase();
+  const isManagerOrAssistant = !user || profile?.role === 'manager' || profile?.role === 'assistant';
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'debtors' | 'settled' | 'overdue'>('all');
+  const [filterClassificationType, setFilterClassificationType] = useState<'all' | 'distinct' | 'struggling' | 'new'>('all');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [showPayments, setShowPayments] = useState(true);
+  const [showWithdrawals, setShowWithdrawals] = useState(true);
+  const [expandedMonths, setExpandedMonths] = useState<string[]>([]);
+  const [visibleMonthCount, setVisibleMonthCount] = useState<number>(6);
+  const [showArchived, setShowArchived] = useState<boolean>(false);
+  const [isManualSelectionMode, setIsManualSelectionMode] = useState(false);
+  const [isArchivingManual, setIsArchivingManual] = useState(false);
+  const [showManualSuccess, setShowManualSuccess] = useState(false);
+  const [selectedTxIds, setSelectedTxIds] = useState<string[]>([]);
   const [sortType, setSortType] = useState<'default' | 'debt_desc' | 'oldest_debt'>('default');
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  const handlePrint = () => {
+    setIsExportModalOpen(true);
+  };
   
   // Confirmation Dialog State
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -84,6 +104,8 @@ export function CustomersTab({
       notesLabel?: string;
     };
     onConfirm: () => void;
+    confirmLabel?: string;
+    variant?: 'danger' | 'warning' | 'info';
   } | null>(null);
 
   // Sync initial select request from dashboard clicks
@@ -148,6 +170,13 @@ export function CustomersTab({
         }
       }
 
+      // Filter by classification
+      if (filterClassificationType !== 'all') {
+        if (item.customer.classification !== filterClassificationType) {
+          return false;
+        }
+      }
+
       if (filterType === 'debtors') {
         return item.remainingDebt > 0;
       }
@@ -171,7 +200,7 @@ export function CustomersTab({
     }
 
     return result;
-  }, [balancesWithOldestDebt, searchQuery, filterType, selectedRegion, sortType]);
+  }, [balancesWithOldestDebt, searchQuery, filterType, selectedRegion, sortType, filterClassificationType]);
 
   const activeCustomerInfo = useMemo(() => {
     if (!selectedCustomerId) return null;
@@ -182,19 +211,92 @@ export function CustomersTab({
     if (!selectedCustomerId) return [];
     return db.transactions
       .filter(tx => tx.customerId === selectedCustomerId)
-      .sort((a, b) => b.date.localeCompare(a.date)); // Newest first
+      .filter(tx => (showPayments && tx.type === 'payment') || (showWithdrawals && tx.type === 'debt'))
+      .filter(tx => showArchived || !tx.isArchived)
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [db.transactions, selectedCustomerId, showPayments, showWithdrawals, showArchived]);
+
+  const groupedTransactions = useMemo(() => {
+    const groups: Record<string, typeof activeTransactions> = {};
+    activeTransactions.forEach(tx => {
+      const month = tx.date.substring(0, 7); // YYYY-MM
+      if (!groups[month]) groups[month] = [];
+      groups[month].push(tx);
+    });
+    return groups;
+  }, [activeTransactions]);
+
+  const archivedCandidates = useMemo(() => {
+    // This logic is now handled inside ArchiveAnalysisModal analysis
+    // But we keep it simple here if we need a count for the badge
+    const activeTxs = db.transactions.filter(tx => tx.customerId === selectedCustomerId && !tx.isArchived);
+    const debts = activeTxs.filter(t => t.type === 'debt').reduce((sum, t) => sum + t.amount, 0);
+    const payments = activeTxs.filter(t => t.type === 'payment').reduce((sum, t) => sum + t.amount, 0);
+    return Math.min(debts, payments); // Simplified "coverage" indicator
+  }, [db.transactions, selectedCustomerId]);
+
+  const debtSuggestions = useMemo(() => {
+    if (!selectedCustomerId) return [];
+    const unpaidDebts = db.transactions
+      .filter(tx => tx.customerId === selectedCustomerId && tx.type === 'debt' && !tx.isArchived)
+      .sort((a,b) => a.date.localeCompare(b.date));
+    
+    // Total payments ever made (unarchived)
+    const totalPayments = db.transactions
+      .filter(tx => tx.customerId === selectedCustomerId && tx.type === 'payment' && !tx.isArchived)
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    let currentPool = totalPayments;
+    const suggestions: { debtId: string, amount: number, isPartial: boolean, tx: Transaction }[] = [];
+    
+    for (const debt of unpaidDebts) {
+      if (currentPool >= debt.amount) {
+        currentPool -= debt.amount;
+      } else {
+        // This is an unpaid or partially unpaid debt
+        const remainingToPay = debt.amount - currentPool;
+        suggestions.push({
+          debtId: debt.id,
+          amount: remainingToPay,
+          isPartial: currentPool > 0,
+          tx: debt
+        });
+        currentPool = 0;
+      }
+    }
+    return suggestions;
   }, [db.transactions, selectedCustomerId]);
 
   const generateWhatsAppLink = (phone: string, text: string) => {
     return `https://wa.me/${formatPhoneNumberForUrl(phone)}?text=${encodeURIComponent(text)}`;
   };
 
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+
+  const handleArchiveTxs = async (ids: string[]) => {
+    if (user) {
+      await archiveTransactionsInFS(ids);
+    } else {
+      const dbData = { ...db };
+      dbData.transactions = dbData.transactions.map(tx => 
+          ids.includes(tx.id) ? { ...tx, isArchived: true } : tx
+      );
+      saveDatabase(dbData);
+      onRefresh();
+    }
+    setIsArchiveModalOpen(false);
+  };
+
   const handleExportStatementToWhatsApp = async () => {
     if (!activeCustomerInfo) return;
     const { customer, totalDebt, totalPaid, remainingDebt } = activeCustomerInfo;
 
+    const busName = profile?.businessName || 'مجموعة كنعان الذكية';
+    const delName = profile?.delegateName || 'عبدالرحمن كنعان';
+    const delPhone = profile?.phone || '0958280936';
+
     // Create details for WhatsApp transmission
-    let text = `💼 *كشف مالي معتمد - مجموعة كنعان الذكية* 🧾\n`;
+    let text = `💼 *كشف مالي معتمد - ${busName}* 🧾\n`;
     text += `*العميل الكريم:* ${customer.name}\n`;
     if (customer.region) {
       text += `*المنطقة / البلد:* ${customer.region}\n`;
@@ -206,8 +308,8 @@ export function CustomersTab({
     text += `• إجمالي المدفوع الموثق: *${formatCurrency(totalPaid)}*\n`;
     text += `-------------------------------------\n`;
     text += `📂 *المرفق المالي:* تم الآن إصدار وتنزيل كشف الحساب المالي التفصيلي كملف PDF رسمي موقع وموثق باسمكم، يرجى تفقده بالمرفقات. 🌾📎\n\n`;
-    text += `أخوكم عبدالرحمن كنعان لتوزيع الأغذية والمشروبات 🌾\n`;
-    text += `للاستعلام والطلب: 0958280936 📞`;
+    text += `أخوكم ${delName} لتوزيع الأغذية والمشروبات 🌾\n`;
+    text += `للاستعلام والطلب: ${delPhone} 📞`;
 
     window.open(generateWhatsAppLink(customer.phone, text), '_blank');
   };
@@ -240,13 +342,39 @@ export function CustomersTab({
     });
   };
 
+  const handleRestoreTxClicked = (txId: string) => {
+    const tx = db.transactions.find(t => t.id === txId);
+    if (!tx) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'استعادة الحركة من الأرشيف',
+      variant: 'info',
+      confirmLabel: 'استعادة الآن',
+      message: 'هل ترغب في إعادة هذه الحركة إلى السجل النشط؟ ستظهر مرة أخرى في كشف الحساب وتدخل في الحسابات الجارية.',
+      onConfirm: async () => {
+        if (user) {
+          await archiveTransactionsInFS([txId], false);
+        } else {
+          const dbData = { ...db };
+          dbData.transactions = dbData.transactions.map(t => 
+            t.id === txId ? { ...t, isArchived: false } : t
+          );
+          saveDatabase(dbData);
+        }
+        onRefresh();
+        setConfirmDialog(null);
+      }
+    });
+  };
+
   const handleDeleteTxClicked = (txId: string) => {
     const tx = db.transactions.find(t => t.id === txId);
     if (!tx) return;
 
     setConfirmDialog({
       isOpen: true,
-      title: 'تأكيد حذف القيد المالي',
+      title: 'تأكيد الحذف النهائي',
       details: {
         type: tx.type,
         amountLabel: formatCurrency(tx.amount),
@@ -254,6 +382,7 @@ export function CustomersTab({
         dateLabel: formatDate(tx.date),
         notesLabel: tx.notes || undefined,
       },
+      message: 'تنبيه: أنت على وشك حذف هذه الحركة نهائياً من النظام. يفضل استخدام الأرشفة بدلاً من الحذف للحفاظ على السجلات التاريخية.',
       onConfirm: async () => {
         if (user) {
           await deleteTransactionFromFS(txId);
@@ -270,12 +399,23 @@ export function CustomersTab({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
       {/* Statement Preview Modal */}
       {activeCustomerInfo && (
-        <StatementPreviewModal
-          isOpen={isExportModalOpen}
-          onClose={() => setIsExportModalOpen(false)}
-          balance={activeCustomerInfo}
-          transactions={activeTransactions}
-        />
+        <>
+          <ArchiveAnalysisModal
+            isOpen={isArchiveModalOpen}
+            onClose={() => setIsArchiveModalOpen(false)}
+            transactions={db.transactions.filter(tx => tx.customerId === selectedCustomerId)}
+            onArchive={handleArchiveTxs}
+          />
+          <StatementPreviewModal
+            isOpen={isExportModalOpen}
+            onClose={() => setIsExportModalOpen(false)}
+            balance={activeCustomerInfo}
+            transactions={activeTransactions}
+            archivedTransactions={db.transactions.filter(tx => tx.customerId === selectedCustomerId && tx.isArchived)}
+            hidePayments={!showPayments}
+            hideWithdrawals={!showWithdrawals}
+          />
+        </>
       )}
       
       {/* Confirmation Dialog Component */}
@@ -288,7 +428,7 @@ export function CustomersTab({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setConfirmDialog(null)}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
             />
             
             {/* Dialog Card */}
@@ -297,22 +437,34 @@ export function CustomersTab({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 15 }}
               transition={{ type: 'spring', duration: 0.4 }}
-              className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full text-right border border-slate-100 z-10 relative overflow-hidden"
+              className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full text-right border border-slate-100 z-10 relative overflow-hidden transition-colors"
               dir="rtl"
             >
               {/* Top Accent Bar */}
-              <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-l from-rose-500 via-amber-500 to-rose-600" />
+              <div className={`absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-l ${
+                confirmDialog.variant === 'warning' || confirmDialog.variant === 'info'
+                  ? 'from-amber-400 via-amber-500 to-indigo-500'
+                  : 'from-rose-500 via-amber-500 to-rose-600'
+              }`} />
 
               {/* Header Icon + Title */}
               <div className="flex items-center gap-3 mb-5 mt-2">
-                <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                  <AlertCircle className="w-5 h-5 animate-pulse" />
+                <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 transition-colors ${
+                  confirmDialog.variant === 'warning' || confirmDialog.variant === 'info'
+                    ? 'bg-amber-50 border-amber-100 text-amber-600'
+                    : 'bg-rose-50 border-rose-100 text-rose-600'
+                }`}>
+                  {confirmDialog.variant === 'warning' || confirmDialog.variant === 'info' ? (
+                    <Archive className="w-5 h-5 animate-pulse" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 animate-pulse" />
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-800 leading-tight">
+                  <h3 className="text-sm font-black text-slate-800 leading-tight transition-colors">
                     {confirmDialog.title}
                   </h3>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1">
+                  <p className="text-[10px] font-bold text-slate-400 mt-1 transition-colors">
                     إجراء حساس يتطلب التحقق لضمان الدقة
                   </p>
                 </div>
@@ -320,7 +472,7 @@ export function CustomersTab({
 
               {/* Message */}
               {confirmDialog.message && (
-                <p className="text-xs text-slate-600 font-medium leading-relaxed mb-6 bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                <p className="text-xs text-slate-600 font-medium leading-relaxed mb-6 bg-slate-50 border border-slate-100 rounded-xl p-3 text-center transition-colors">
                   {confirmDialog.message}
                 </p>
               )}
@@ -328,11 +480,11 @@ export function CustomersTab({
               {/* Transaction / Customer Structured Details */}
               {confirmDialog.details && (
                 <div className="mb-5 space-y-3">
-                  <div className="text-center p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                  <div className="text-center p-3.5 bg-slate-50 border border-slate-100 rounded-2xl transition-colors">
                     <span className="text-[9px] font-bold text-slate-400 block mb-1">
                       {confirmDialog.details.type === 'customer' ? 'الاسم الكامل للعميل المراد حذفه' : 'القيمة المالية المسجلة بالقيد'}
                     </span>
-                    <span className={`text-base font-black ${
+                    <span className={`text-base font-black transition-colors ${
                       confirmDialog.details.type === 'debt' 
                         ? 'text-rose-600' 
                         : confirmDialog.details.type === 'payment' 
@@ -342,13 +494,13 @@ export function CustomersTab({
                       {confirmDialog.details.amountLabel}
                     </span>
                     {confirmDialog.details.secondaryLabel && (
-                      <span className="text-[10px] font-black text-slate-500 block mt-1.5 bg-white border border-slate-200/40 rounded-full py-0.5 px-3.5 inline-block mx-auto shadow-xs">
+                      <span className="text-[10px] font-black text-slate-500 block mt-1.5 bg-white border border-slate-200/40 rounded-full py-0.5 px-3.5 inline-block mx-auto shadow-xs transition-colors">
                         {confirmDialog.details.secondaryLabel}
                       </span>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-1.5 text-[11px] font-bold text-slate-600 bg-slate-50/40 rounded-xl p-1">
+                  <div className="grid grid-cols-1 gap-1.5 text-[11px] font-bold text-slate-600 bg-slate-50/40 rounded-xl p-1 transition-colors">
                     {confirmDialog.details.dateLabel && (
                       <div className="flex items-center justify-between p-2 hover:bg-white rounded-lg transition-all">
                         <span className="text-slate-400 font-medium select-none">
@@ -359,10 +511,10 @@ export function CustomersTab({
                     )}
                     {confirmDialog.details.notesLabel && (
                       <div className="p-2 hover:bg-white rounded-lg transition-all border border-dashed border-slate-100 mt-1">
-                        <span className="text-slate-400 font-medium block mb-1 select-none">
+                        <span className="text-slate-400 font-medium block mb-1 select-none text-right">
                           بيان الملاحظة الموثقة:
                         </span>
-                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed bg-slate-100/30 rounded-lg p-2 text-right">
+                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed bg-slate-100/30 rounded-lg p-2 text-right transition-colors">
                           {confirmDialog.details.notesLabel}
                         </p>
                       </div>
@@ -372,8 +524,16 @@ export function CustomersTab({
               )}
 
               {/* Security warning notice */}
-              <div className="text-[9px] text-rose-500 font-bold bg-rose-50/30 border border-rose-100/30 rounded-xl p-2.5 text-center mb-5">
-                ⚠️ تنبيه: بمجرد التأكيد، سيتم حذف السجل نهائياً وتحديث كافة التقارير والحسابات المرتبطة تلقائياً. لا يمكن التراجع عن هذا الإجراء لضمان الدقة المالية.
+              <div className={`text-[9px] font-bold border rounded-xl p-2.5 text-center mb-5 transition-colors ${
+                confirmDialog.variant === 'warning' || confirmDialog.variant === 'info'
+                  ? 'text-amber-600 bg-amber-50/30 border-amber-100/30'
+                  : 'text-rose-500 bg-rose-50/30 border-rose-100/30'
+              }`}>
+                {confirmDialog.variant === 'warning' || confirmDialog.variant === 'info' ? (
+                  <>💡 سيتم نقل هذه العمليات للأرشيف ولا يمكن التراجع عنها إلا عبر الإعدادات المتقدمة.</>
+                ) : (
+                  <>⚠️ تنبيه: بمجرد التأكيد، سيتم حذف السجل نهائياً وتحديث كافة التقارير والحسابات المرتبطة تلقائياً.</>
+                )}
               </div>
 
               {/* Actions Footer */}
@@ -385,10 +545,17 @@ export function CustomersTab({
                   إلغاء
                 </button>
                 <button 
-                  onClick={confirmDialog.onConfirm}
-                  className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center"
+                  onClick={() => {
+                    confirmDialog.onConfirm();
+                    setConfirmDialog(null);
+                  }}
+                  className={`flex-1 py-2 text-white font-bold rounded-xl text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center ${
+                    confirmDialog.variant === 'warning' || confirmDialog.variant === 'info'
+                      ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20'
+                      : 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20'
+                  }`}
                 >
-                  تأكيد الحذف
+                  {confirmDialog.confirmLabel || 'تأكيد الحذف'}
                 </button>
               </div>
             </motion.div>
@@ -567,6 +734,15 @@ export function CustomersTab({
                             {item.customer.region}
                           </span>
                         )}
+                        {item.customer.classification && (
+                          <span className={`px-1.5 py-0.5 rounded-md font-bold text-[8px] ${
+                            item.customer.classification === 'distinct' ? 'bg-indigo-50 text-indigo-600' :
+                            item.customer.classification === 'struggling' ? 'bg-rose-50 text-rose-600' :
+                            'bg-emerald-50 text-emerald-600'
+                          }`}>
+                            {item.customer.classification === 'distinct' ? 'مميز' : item.customer.classification === 'struggling' ? 'متعثر' : 'جديد'}
+                          </span>
+                        )}
                         {item.isOverdue && (
                           <span className="bg-amber-50 text-amber-600 px-1 py-0.5 rounded-sm font-bold text-[8px]">فات الاستحقاق</span>
                         )}
@@ -623,6 +799,7 @@ export function CustomersTab({
             </motion.div>
           ) : (
             <motion.div 
+              id="print-area"
               key={activeCustomerInfo.customer.id}
               initial={{ opacity: 0, y: 12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -636,7 +813,7 @@ export function CustomersTab({
               <button
                 type="button"
                 onClick={() => setSelectedCustomerId(null)}
-                className="lg:hidden flex items-center gap-1 text-xs font-semibold text-indigo-600 mb-3 cursor-pointer"
+                className="lg:hidden flex items-center gap-1 text-xs font-semibold text-indigo-600 mb-3 cursor-pointer print:hidden"
               >
                 <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
                 الرجوع لدليل العملاء
@@ -675,20 +852,101 @@ export function CustomersTab({
               </div>
 
               {/* Edit / Delete profile control center */}
-              <div className="flex items-center gap-2 self-start md:self-center">
-                <button
-                  onClick={() => onEditCustomerTrigger(activeCustomerInfo.customer)}
-                  className="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all cursor-pointer"
-                >
-                  تعديل الملف
-                </button>
-                <button
-                  onClick={() => handleDeleteCustomerClicked(activeCustomerInfo.customer.id, activeCustomerInfo.customer.name)}
-                  className="p-2 bg-red-50 hover:bg-red-150 text-red-600 rounded-xl transition-all cursor-pointer"
-                  title="حذف العميل نهائياً"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 self-start md:self-center">
+                  <button
+                    onClick={handlePrint}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-all cursor-pointer print:hidden"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    طباعة
+                  </button>
+                  <button
+                    onClick={() => onEditCustomerTrigger(activeCustomerInfo.customer)}
+                    className="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all cursor-pointer print:hidden"
+                  >
+                    تعديل الملف
+                  </button>
+                  {isManagerOrAssistant && (
+                    <button
+                      onClick={() => handleDeleteCustomerClicked(activeCustomerInfo.customer.id, activeCustomerInfo.customer.name)}
+                      className="p-2 bg-red-50 hover:bg-red-150 text-red-600 rounded-xl transition-all cursor-pointer print:hidden"
+                      title="حذف العميل نهائياً"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 print:hidden">
+                  <button
+                    onClick={() => setShowPayments(!showPayments)}
+                    className={`px-3 py-1 text-[10px] sm:text-xs rounded-full transition-all border font-black flex items-center gap-1 ${
+                      showPayments 
+                        ? 'bg-emerald-500 text-white border-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105' 
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-600 shadow-sm'
+                    }`}
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full ${showPayments ? 'bg-white animate-pulse' : 'bg-emerald-500'}`} />
+                    {showPayments ? 'إخفاء الدفعات' : 'عرض الدفعات'}
+                  </button>
+                  <button
+                    onClick={() => setShowWithdrawals(!showWithdrawals)}
+                    className={`px-3 py-1 text-[10px] sm:text-xs rounded-full transition-all border font-black flex items-center gap-1 ${
+                      showWithdrawals 
+                        ? 'bg-rose-500 text-white border-rose-600 shadow-[0_0_15px_rgba(244,63,94,0.4)] scale-105' 
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-rose-300 hover:text-rose-600 shadow-sm'
+                    }`}
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full ${showWithdrawals ? 'bg-white animate-pulse' : 'bg-rose-500'}`} />
+                    {showWithdrawals ? 'إخفاء السحوبات' : 'عرض السحوبات'}
+                  </button>
+                  <button
+                    onClick={() => setShowArchived(!showArchived)}
+                    className={`px-3 py-1 text-[10px] sm:text-xs rounded-full transition-all border font-black flex items-center gap-1 ${
+                      showArchived 
+                        ? 'bg-amber-500 text-white border-amber-600 shadow-[0_0_15px_rgba(245,158,11,0.4)] scale-105' 
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300 hover:text-amber-600 shadow-sm'
+                    }`}
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full ${showArchived ? 'bg-white animate-pulse' : 'bg-amber-500'}`} />
+                    {showArchived ? 'إخفاء الأرشيف' : 'عرض الأرشيف'}
+                  </button>
+                  
+                  {isManagerOrAssistant && activeCustomerInfo && (
+                    <button
+                      onClick={() => {
+                        setIsManualSelectionMode(!isManualSelectionMode);
+                        setSelectedTxIds([]);
+                      }}
+                      className={`px-3 py-1 text-[10px] sm:text-xs rounded-full transition-all border font-bold flex items-center gap-1 ${
+                        isManualSelectionMode 
+                          ? 'bg-indigo-600 text-white border-indigo-700 shadow-lg shadow-indigo-100 scale-105' 
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200 hover:text-indigo-600'
+                      }`}
+                    >
+                      <FileSpreadsheet className="w-3 h-3" />
+                      {isManualSelectionMode ? 'إلغاء التحديد اليدوي' : 'أرشفة يدوية'}
+                    </button>
+                  )}
+
+                  {isManagerOrAssistant && archivedCandidates.length > 0 && (
+                    <button
+                      onClick={() => setIsArchiveModalOpen(true)}
+                      className="px-3 py-1 text-[10px] sm:text-xs rounded-full bg-amber-500 text-white hover:bg-amber-600 transition-all shadow-[0_0_15px_rgba(245,158,11,0.4)] flex items-center gap-1 font-bold animate-pulse print:hidden"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      مستشار الأرشفة
+                    </button>
+                  )}
+                  {visibleMonthCount < Object.keys(groupedTransactions).length && (
+                    <button
+                      onClick={() => setVisibleMonthCount(prev => prev + 6)}
+                      className="px-3 py-1 text-xs rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    >
+                      عرض المزيد
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -704,18 +962,18 @@ export function CustomersTab({
             </div>
 
             {/* Detailed financial status summary for selected customer */}
-            <div className="grid grid-cols-3 gap-3 p-4 bg-slate-50 rounded-2xl text-right">
+            <div className="grid grid-cols-3 gap-3 p-4 bg-slate-50 rounded-2xl text-right transition-colors leading-tight">
               <div className="space-y-1">
-                <span className="text-[10px] text-slate-400 font-bold block">إجمالي الديون المسجلة</span>
-                <span className="text-base font-black text-rose-600">{formatCurrency(activeCustomerInfo.totalDebt)}</span>
+                <span className="text-[10px] text-slate-400 font-bold block transition-colors">إجمالي الديون المسجلة</span>
+                <span className="text-base font-black text-rose-600 transition-colors">{formatCurrency(activeCustomerInfo.totalDebt)}</span>
               </div>
-              <div className="space-y-1 border-r border-slate-200 pr-3">
-                <span className="text-[10px] text-slate-400 font-bold block">إجمالي المسدد الفعلي</span>
-                <span className="text-base font-black text-emerald-600">✓ {formatCurrency(activeCustomerInfo.totalPaid)}</span>
+              <div className="space-y-1 border-r border-slate-200 pr-3 transition-colors">
+                <span className="text-[10px] text-slate-400 font-bold block transition-colors">إجمالي المسدد الفعلي</span>
+                <span className="text-base font-black text-emerald-600 transition-colors">✓ {formatCurrency(activeCustomerInfo.totalPaid)}</span>
               </div>
-              <div className="space-y-1 border-r border-slate-200 pr-3">
-                <span className="text-[10px] text-slate-400 font-bold block">الذمة المتبقية الحالية</span>
-                <span className={`text-base font-black ${
+              <div className="space-y-1 border-r border-slate-200 pr-3 transition-colors">
+                <span className="text-[10px] text-slate-400 font-bold block transition-colors">الذمة المتبقية الحالية</span>
+                <span className={`text-base font-black transition-colors ${
                   activeCustomerInfo.remainingDebt > 0 ? 'text-rose-600' : 'text-emerald-600'
                 }`}>
                   {formatCurrency(activeCustomerInfo.remainingDebt)}
@@ -724,18 +982,62 @@ export function CustomersTab({
             </div>
 
             {activeCustomerInfo.customer.notes && (
-              <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/40 text-xs text-indigo-900">
+              <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/40 text-xs text-indigo-900 transition-colors">
                 <strong>ملاحظة التاجر: </strong>
                 {activeCustomerInfo.customer.notes}
               </div>
             )}
 
+            {/* Automated AI Account Analysis & Debt Settlement Suggestions */}
+            {debtSuggestions.length > 0 && (
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50/20 border border-amber-100 rounded-xl p-3 space-y-2.5 mt-2 animate-in fade-in slide-in-from-top-1 duration-300 print:hidden transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                    <h4 className="text-[10px] font-black text-amber-900 uppercase tracking-wider transition-colors">مستشار كنعان</h4>
+                  </div>
+                  <div className="text-[9px] font-bold text-amber-600 bg-white/50 px-2 py-0.5 rounded-full border border-amber-200/50 transition-colors">
+                    اقتراحات تصفير الذمم
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {debtSuggestions.slice(0, 2).map((s, idx) => (
+                    <div key={s.debtId} className="bg-white/80 border border-amber-200/60 p-2.5 rounded-xl flex items-center justify-between group hover:border-amber-400 transition-all shadow-sm">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] text-slate-500 font-bold transition-colors">
+                            {idx === 0 ? 'لتغطية الأقدم:' : 'للفاتورة التالية:'}
+                          </span>
+                        </div>
+                        <div className="text-sm font-black text-slate-900 flex items-baseline gap-1 transition-colors">
+                           {formatCurrency(s.amount)}
+                           {s.isPartial && <span className="text-[8px] text-rose-500 font-black bg-rose-50 px-1.5 rounded-md transition-colors">جزئي</span>}
+                        </div>
+                        <div className="text-[8px] text-slate-400 font-bold transition-colors">{formatDate(s.tx.date)}</div>
+                      </div>
+                      <button 
+                        onClick={(e) => {
+                           e.stopPropagation();
+                           onAddTransactionTrigger(selectedCustomerId!, 'payment', s.amount, `تسديد ${s.isPartial ? 'جزئي' : 'كامل'} للفاتورة المؤرخة في ${formatDate(s.tx.date)}`);
+                        }}
+                        className="w-8 h-8 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-xs flex items-center justify-center group/btn"
+                        title="تطبيق فوري"
+                      >
+                        <Plus className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Print Account & New Entries Triggers */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 print:hidden">
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleExportStatementToWhatsApp}
-                  className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-xs"
+                  className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-xs shadow-emerald-500/10"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>مشاركة واتساب كنعان 🌾</span>
@@ -762,66 +1064,246 @@ export function CustomersTab({
 
             {/* Individual Account Statement Record list */}
             <div className="pt-2">
-              <h4 className="text-xs font-bold text-slate-700 mb-2">الدقتر التفصيلي للحركات المالية</h4>
+              <h4 className="text-xs font-bold text-slate-700 mb-2 transition-colors">الدفتر التفصيلي للحركات المالية</h4>
               
               {activeTransactions.length === 0 ? (
-                <div className="p-10 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs">
+                <div className="p-10 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs transition-colors">
                   لا توجد أي قيود مالية مقيدة في ذمة هذا العميل حتى الآن.
                 </div>
               ) : (
-                <div className="border border-slate-100 rounded-2xl overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
+                <div className="border border-slate-100 rounded-2xl overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 transition-colors">
                   <table className="w-full min-w-[650px] text-right text-xs">
                     <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100 text-slate-505 text-[10px] font-bold">
+                      <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-[10px] font-bold transition-colors">
+                        {isManualSelectionMode && (
+                          <th className="px-4 py-2.5 text-center w-10">
+                            <input 
+                              type="checkbox" 
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer transition-colors"
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedTxIds(activeTransactions.map(tx => tx.id));
+                                } else {
+                                  setSelectedTxIds([]);
+                                }
+                              }}
+                              checked={selectedTxIds.length === activeTransactions.length && activeTransactions.length > 0}
+                            />
+                          </th>
+                        )}
                         <th className="px-4 py-2.5">التاريخ</th>
                         <th className="px-4 py-2.5">نوع الحركة</th>
-                        <th className="px-4 py-2.5 text-slate-600">بيان المعاملة</th>
-                        <th className="px-4 py-2.5 text-amber-900">موعد الاستحقاق</th>
+                        <th className="px-4 py-2.5">بيان المعاملة</th>
+                        <th className="px-4 py-2.5">موعد الاستحقاق</th>
                         <th className="px-4 py-2.5">القيمة المالية</th>
                         <th className="px-4 py-2.5 text-center">إجراء</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {activeTransactions.map((tx) => (
-                        <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-4 py-3 font-medium text-slate-500">{tx.date}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-sm font-bold text-[9px] ${
-                              tx.type === 'debt' 
-                                ? 'bg-rose-50 text-rose-600' 
-                                : 'bg-emerald-50 text-emerald-600'
-                            }`}>
-                              {tx.type === 'debt' ? 'دين جديد (+)' : 'سداد دفعة (-)'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 max-w-[180px] truncate" title={tx.notes}>
-                            {tx.notes || '---'}
-                          </td>
-                          <td className="px-4 py-3 text-slate-500">
-                            {tx.dueDate ? (
-                              <span className="font-semibold text-rose-500">{tx.dueDate}</span>
-                            ) : (
-                              <span className="text-slate-300">بلا تاريخ استحقاق</span>
-                            )}
-                          </td>
-                          <td className={`px-4 py-3 font-bold ${
-                            tx.type === 'debt' ? 'text-rose-600' : 'text-emerald-600'
-                          }`}>
-                            {tx.type === 'debt' ? '+' : '-'}{formatCurrency(tx.amount)}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => handleDeleteTxClicked(tx.id)}
-                              className="text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-100 p-1.5 rounded-lg transition-all cursor-pointer inline-flex items-center justify-center shadow-2xs hover:shadow-xs hover:scale-105 active:scale-95"
-                              title="حذف هذا القيد المالي"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                    <tbody className="divide-y divide-slate-100 text-slate-700 transition-colors">
+                      {Object.keys(groupedTransactions).sort((a,b) => b.localeCompare(a)).slice(0, visibleMonthCount).map(month => {
+                        const monthTransactions = groupedTransactions[month];
+                        const isExpanded = expandedMonths.includes(month);
+                        const totalPayments = monthTransactions.filter(t => t.type === 'payment').reduce((sum, t) => sum + (t.amount || 0), 0);
+                        const totalDebt = monthTransactions.filter(t => t.type === 'debt').reduce((sum, t) => sum + (t.amount || 0), 0);
+                        
+                        return (
+                          <React.Fragment key={month}>
+                            <tr className="bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => setExpandedMonths(prev => isExpanded ? prev.filter(m => m !== month) : [...prev, month])}>
+                              <td colSpan={isManualSelectionMode ? 7 : 6} className="px-4 py-2 font-bold text-slate-700 flex justify-between">
+                                <span>{month}</span>
+                                <span className="text-[10px] text-slate-500 font-black">
+                                  [سداد: {formatCurrency(totalPayments)}] [دين: {formatCurrency(totalDebt)}] {isExpanded ? '▼' : '▶'}
+                                </span>
+                              </td>
+                            </tr>
+                            {isExpanded && monthTransactions.map((tx) => (
+                              <tr 
+                                key={tx.id} 
+                                className={`transition-all duration-200 cursor-pointer ${
+                                  selectedTxIds.includes(tx.id) 
+                                    ? 'bg-indigo-50/50 hover:bg-indigo-100/50' 
+                                    : tx.isArchived 
+                                      ? 'bg-slate-50/30 opacity-60 grayscale-[0.3]' 
+                                      : 'hover:bg-slate-50/50'
+                                }`}
+                                onClick={() => {
+                                  if (isManualSelectionMode) {
+                                    setSelectedTxIds(prev => 
+                                      prev.includes(tx.id) ? prev.filter(id => id !== tx.id) : [...prev, tx.id]
+                                    );
+                                  }
+                                }}
+                              >
+                                {isManualSelectionMode && (
+                                  <td className="px-4 py-3 text-center">
+                                    <input 
+                                      type="checkbox" 
+                                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer transition-colors"
+                                      checked={selectedTxIds.includes(tx.id)}
+                                      readOnly
+                                    />
+                                  </td>
+                                )}
+                                <td className="px-4 py-3 font-medium text-slate-500">
+                                  <div className="flex items-center gap-2">
+                                    {tx.isArchived && <Archive className="w-3 h-3 text-amber-500" />}
+                                    {tx.date}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-sm font-bold text-[9px] transition-colors ${
+                                    tx.type === 'debt' 
+                                      ? 'bg-rose-50 text-rose-600' 
+                                      : 'bg-emerald-50 text-emerald-600'
+                                  }`}>
+                                    {tx.type === 'debt' ? 'دين جديد (+)' : 'سداد دفعة (-)'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-slate-600 max-w-[180px] truncate transition-colors" title={tx.notes}>
+                                  {tx.notes || '---'}
+                                </td>
+                                <td className="px-4 py-3 text-slate-500 transition-colors">
+                                  {tx.dueDate ? (
+                                    <span className="font-semibold text-rose-500">{tx.dueDate}</span>
+                                  ) : (
+                                    <span className="text-slate-300">بلا تاريخ استحقاق</span>
+                                  )}
+                                </td>
+                                <td className={`px-4 py-3 font-bold transition-colors ${
+                                  tx.type === 'debt' ? 'text-rose-600' : 'text-emerald-600'
+                                }`}>
+                                  {tx.type === 'debt' ? '+' : '-'}{formatCurrency(tx.amount)}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  {isManagerOrAssistant ? (
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      {tx.isArchived ? (
+                                        <button
+                                          onClick={() => handleRestoreTxClicked(tx.id)}
+                                          className="text-emerald-600 hover:text-white bg-emerald-50 hover:bg-emerald-600 border border-emerald-100 p-1.5 rounded-lg transition-all cursor-pointer inline-flex items-center justify-center shadow-2xs hover:shadow-xs hover:scale-105 active:scale-95"
+                                          title="تمت أرشفتها - انقر للاستعادة للسجل النشط"
+                                        >
+                                          <RotateCcw className="w-3.5 h-3.5" />
+                                        </button>
+                                      ) : null}
+                                      <button
+                                        onClick={() => handleDeleteTxClicked(tx.id)}
+                                        className="text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-100 p-1.5 rounded-lg transition-all cursor-pointer inline-flex items-center justify-center shadow-2xs hover:shadow-xs hover:scale-105 active:scale-95"
+                                        title={tx.isArchived ? "حذف نهائي من الأرشيف" : "حذف هذا القيد المالي"}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[9px] text-slate-400 font-bold bg-slate-100 px-2 py-1 rounded transition-colors" title="مغلق لعدم كفاية الصلاحية">
+                                      معتمد ✓
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
+                  
+                  {/* Floating Manual Archive Action Bar */}
+                  <AnimatePresence>
+                    {isManualSelectionMode && selectedTxIds.length > 0 && (
+                      <motion.div 
+                        initial={{ y: 50, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 50, opacity: 0 }}
+                        className="sticky bottom-4 left-4 right-4 z-20"
+                      >
+                        <div className="bg-slate-800 text-white rounded-2xl p-4 shadow-2xl border border-slate-700 flex items-center justify-between mx-4 min-h-[72px]">
+                          <AnimatePresence mode="wait">
+                            {showManualSuccess ? (
+                              <motion.div 
+                                key="success"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="flex items-center gap-3 text-emerald-400 w-full"
+                              >
+                                <div className="bg-emerald-500/20 p-2 rounded-xl">
+                                  <Check className="w-5 h-5 text-emerald-400" />
+                                </div>
+                                <span className="font-black text-sm">تمت أرشفة العمليات بنجاح</span>
+                              </motion.div>
+                            ) : (
+                              <motion.div 
+                                key="controls"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="flex items-center justify-between w-full"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="bg-indigo-500 p-2 rounded-xl">
+                                    <Archive className="w-5 h-5 text-white" />
+                                  </div>
+                                  <div>
+                                    <div className="text-xs font-bold">أرشفة يدوية اختيارية</div>
+                                    <div className="text-[10px] text-slate-300 font-medium">تم تحديد {selectedTxIds.length} عملية للأرشفة</div>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => setSelectedTxIds([])}
+                                    disabled={isArchivingManual}
+                                    className="px-4 py-2 text-xs font-bold text-slate-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                                  >
+                                    إلغاء
+                                  </button>
+                                  <button
+                                    disabled={isArchivingManual}
+                                    onClick={() => {
+                                        setConfirmDialog({
+                                          isOpen: true,
+                                          title: 'تأكيد الأرشفة اليدوية',
+                                          variant: 'info',
+                                          confirmLabel: 'أرشفة الآن',
+                                          message: `هل أنت متأكد من رغبتك في أرشفة عدد (${selectedTxIds.length}) عملية يدوياً؟ ستنتقل العمليات المختارة للأرشيف وسيبقى الكشف النشط مرتباً بميزان دقيق.`,
+                                          onConfirm: async () => {
+                                            if (!user?.uid) return;
+                                            setIsArchivingManual(true);
+                                            try {
+                                              await archiveTransactionsInFS(selectedTxIds);
+                                              setShowManualSuccess(true);
+                                              setTimeout(() => {
+                                                setShowManualSuccess(false);
+                                                setIsManualSelectionMode(false);
+                                                setSelectedTxIds([]);
+                                                setIsArchivingManual(false);
+                                                onRefresh();
+                                              }, 1500);
+                                            } catch (err) {
+                                              console.error(err);
+                                              setIsArchivingManual(false);
+                                            }
+                                        }
+                                      });
+                                    }}
+                                    className="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 rounded-xl text-xs font-black shadow-lg shadow-indigo-500/20 transition-all cursor-pointer flex items-center gap-1.5 min-w-[120px] justify-center"
+                                  >
+                                    {isArchivingManual ? (
+                                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                      <>
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        تنفيذ الأرشفة
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
             </div>

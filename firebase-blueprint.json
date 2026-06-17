@@ -1,19 +1,52 @@
 {
   "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User business profile containing roles and company assignments",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "businessName": { "type": "string" },
+        "businessType": { "type": "string", "enum": ["solo", "company"] },
+        "role": { "type": "string", "enum": ["manager", "assistant", "accountant", "representative"] },
+        "companyId": { "type": "string", "description": "Workspace identifier for grouping data" },
+        "phone": { "type": "string" },
+        "delegateName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "businessName", "businessType", "role", "companyId", "createdAt"]
+    },
+    "TeamInvitation": {
+      "title": "TeamInvitation",
+      "description": "Pre-configured invitation linking emails to a company with specific roles",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "companyId": { "type": "string" },
+        "businessName": { "type": "string" },
+        "role": { "type": "string", "enum": ["manager", "assistant", "accountant", "representative"] },
+        "invitedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "companyId", "businessName", "role", "invitedBy", "createdAt"]
+    },
     "Customer": {
       "title": "Customer",
       "description": "Merchant customer record for debt tracking",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "ownerId": { "type": "string", "description": "Authenticated merchant user ID" },
+        "companyId": { "type": "string", "description": "Shared company workspace identifier" },
+        "creatorId": { "type": "string", "description": "The user UID who registered the customer" },
         "name": { "type": "string" },
         "phone": { "type": "string" },
         "email": { "type": "string" },
         "notes": { "type": "string" },
+        "region": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "ownerId", "name", "phone", "createdAt"]
+      "required": ["id", "companyId", "creatorId", "name", "phone", "createdAt"]
     },
     "Transaction": {
       "title": "Transaction",
@@ -21,7 +54,9 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "ownerId": { "type": "string", "description": "Authenticated merchant user ID" },
+        "companyId": { "type": "string", "description": "Shared company workspace identifier" },
+        "creatorId": { "type": "string", "description": "The user UID who registered the transaction" },
+        "creatorEmail": { "type": "string", "description": "Email of the user who made the entry" },
         "customerId": { "type": "string" },
         "type": { "type": "string", "enum": ["debt", "payment"] },
         "amount": { "type": "number" },
@@ -29,17 +64,25 @@
         "dueDate": { "type": "string" },
         "notes": { "type": "string" }
       },
-      "required": ["id", "ownerId", "customerId", "type", "amount", "date"]
+      "required": ["id", "companyId", "creatorId", "customerId", "type", "amount", "date"]
     }
   },
   "firestore": {
+    "/profiles/{userId}": {
+      "schema": "UserProfile",
+      "description": "Store individual accounts profile data and roles"
+    },
+    "/invitations/{invitationId}": {
+      "schema": "TeamInvitation",
+      "description": "Store pending team invitations"
+    },
     "/customers/{customerId}": {
       "schema": "Customer",
-      "description": "The collection of merchant customers"
+      "description": "The collection of customers for the company"
     },
     "/transactions/{transactionId}": {
       "schema": "Transaction",
-      "description": "The collection of debts and payments"
+      "description": "The collection of debts and payments for the company"
     }
   }
 }
