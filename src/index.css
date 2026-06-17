@@ -31,6 +31,27 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.3s ease, color 0.3s ease;
+  
+  /* Security: Prevent text selection and long-press menus */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Re-enable selection for inputs and textareas so users can type and edit */
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Prevent image dragging and saving context menus */
+img {
+  -webkit-user-drag: none;
+  pointer-events: auto; /* Allow clicks, but touch-callout in body handles the rest */
 }
 
 /* Beautiful custom smooth scrollbar for our columns and page */

@@ -258,20 +258,38 @@ export function TeamTab() {
             {teamMembers.map((m) => {
               const roleInfo = translateRole(m.role);
               const isCurrentUser = m.userId === profile?.userId;
+              
+              const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+              const isActive = m.lastActive && m.lastActive > fiveMinutesAgo;
+
               return (
                 <div 
                   key={m.userId}
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-150 gap-4 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-slate-200 rounded-full flex items-center justify-center font-black text-xs text-slate-600 shrink-0 uppercase border border-slate-300 transition-colors">
-                      {m.delegateName?.slice(0, 2) || m.email?.slice(0, 2)}
+                    <div className="relative shrink-0">
+                      <div className="w-9 h-9 bg-slate-200 rounded-full flex items-center justify-center font-black text-xs text-slate-600 shrink-0 uppercase border border-slate-300 transition-colors">
+                        {m.delegateName?.slice(0, 2) || m.email?.slice(0, 2)}
+                      </div>
+                      {isActive && (
+                        <span className="absolute -bottom-0.5 -left-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-50 animate-pulse" />
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-black text-slate-850 transition-colors">{m.delegateName || 'بدون اسم'}</span>
-                        {isCurrentUser && (
+                        {isActive && (
+                          <span className="text-[8px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.5 rounded-md border border-emerald-100 transition-colors flex items-center gap-1">
+                            <span className="w-1 h-1 bg-emerald-500 rounded-full" />
+                            متفاعل الآن
+                          </span>
+                        )}
+                        {isCurrentUser && !isActive && (
                           <span className="text-[8px] bg-slate-200 text-slate-600 font-black px-1.5 py-0.5 rounded-md border border-slate-300 transition-colors">أنت الحالي</span>
+                        )}
+                        {isCurrentUser && isActive && (
+                          <span className="text-[8px] bg-indigo-50 text-indigo-700 font-bold px-1.5 py-0.5 rounded-md border border-indigo-100 transition-colors">أنت</span>
                         )}
                       </div>
                       <span className="text-[10px] text-slate-450 block truncate max-w-[200px] mt-0.5 font-semibold text-left transition-colors">{m.email}</span>

@@ -215,18 +215,12 @@ export const PrintStatementTemplate: React.FC<PrintStatementTemplateProps> = ({
         {!hideWithdrawals && (
           <div className={`p-2 rounded-lg flex flex-col justify-center min-h-[55px] sm:min-h-[65px]`} style={{ backgroundColor: '#ffffff', borderColor: '#bfdbfe', borderWidth: 1 }}>
             <p className={`text-[10px] sm:text-xs font-bold mb-1 text-center`} style={{ color: '#64748b' }}>إجمالي البضاعة</p>
-            <p className={`text-xs sm:text-lg font-black text-center`} style={{ color: '#1e40af' }}>{formatCurrency(totalDebt + totalArchived)}</p>
-            <p className={`text-center text-[9px] sm:text-[10px] font-bold mt-0.5`} style={{ color: '#64748b' }}>{transactions.filter(t => t.type === 'debt').length + archivedTransactions.length} تسليم</p>
+            <p className={`text-xs sm:text-lg font-black text-center`} style={{ color: '#1e40af' }}>{formatCurrency(totalDebt)}</p>
+            <p className={`text-center text-[9px] sm:text-[10px] font-bold mt-0.5`} style={{ color: '#64748b' }}>{transactions.filter(t => t.type === 'debt').length} تسليم</p>
           </div>
         )}
       </div>
       
-      {archivedTransactions.length > 0 && (
-         <div className="mb-6 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs sm:text-sm text-center">
-            تتضمن حساباتكم {archivedTransactions.length} عملية مؤرشفة (مدفوعة بالكامل) بقيمة إجمالية: {formatCurrency(totalArchived)}
-         </div>
-      )}
-
       {/* Transactions */}
       <div className={`space-y-6 sm:space-y-8 mb-6 sm:mb-8`}>
         {!hideWithdrawals && (

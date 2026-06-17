@@ -82,6 +82,7 @@ export interface UserProfile {
   businessEmoji?: string;
   businessDesc?: string;
   copyrightText?: string;
+  lastActive?: string;
 }
 
 export interface TeamInvitation {
@@ -103,6 +104,9 @@ interface FirebaseContextType {
   pendingInvitations: TeamInvitation[];
   customers: Customer[];
   transactions: Transaction[];
+  isSyncing: boolean;
+  isOnline: boolean;
+  pendingSyncCount: number;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string) => Promise<void>;
@@ -151,6 +155,21 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(window.navigator.onLine);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+  // 0. Monitor Online Status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // 1. Observe Auth Changes
   useEffect(() => {
@@ -166,7 +185,23 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setTransactions([]);
       }
     });
-    return () => unsubscribe();
+
+    // Update lastActive timestamp periodically
+    const presenceInterval = setInterval(async () => {
+      if (auth.currentUser) {
+        try {
+          const profileRef = doc(db, 'profiles', auth.currentUser.uid);
+          await updateDoc(profileRef, { lastActive: new Date().toISOString() });
+        } catch (e) {
+          // Ignore background update errors
+        }
+      }
+    }, 120000); // Every 2 minutes
+
+    return () => {
+      unsubscribe();
+      clearInterval(presenceInterval);
+    };
   }, []);
 
   // 2. Fetch User Profile & Handle Invitations
@@ -264,6 +299,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // A. Listen to Customers representing the Company
     const qCustomers = query(collection(db, 'customers'), where('companyId', '==', compId));
     const unsubCustomers = onSnapshot(qCustomers, (snapshot) => {
+      setIsSyncing(true);
       const items: Customer[] = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
@@ -280,16 +316,24 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
       });
       setCustomers(items);
+      setTimeout(() => setIsSyncing(false), 800);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'customers');
+      setIsSyncing(false);
     });
 
     // B. Listen to Transactions representing the Company
     const qTransactions = query(collection(db, 'transactions'), where('companyId', '==', compId));
-    const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
+    const unsubTransactions = onSnapshot(qTransactions, { includeMetadataChanges: true }, (snapshot) => {
+      setIsSyncing(true);
       const items: Transaction[] = [];
+      let pending = 0;
+      
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
+        if (docSnap.metadata.hasPendingWrites) {
+          pending++;
+        }
         items.push({
           id: docSnap.id,
           customerId: d.customerId || '',
@@ -302,8 +346,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
       });
       setTransactions(items);
+      setPendingSyncCount(pending);
+      setTimeout(() => setIsSyncing(false), 800);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'transactions');
+      setIsSyncing(false);
     });
 
     // C. Listen to Team Members of the same company
@@ -324,7 +371,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           createdAt: d.createdAt || '',
           businessEmoji: d.businessEmoji || '🌾',
           businessDesc: d.businessDesc || '',
-          copyrightText: d.copyrightText || ''
+          copyrightText: d.copyrightText || '',
+          lastActive: d.lastActive
         });
       });
       setTeamMembers(items);
@@ -683,6 +731,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       pendingInvitations,
       customers,
       transactions,
+      isSyncing,
+      isOnline,
+      pendingSyncCount,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,

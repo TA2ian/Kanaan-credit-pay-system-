@@ -437,54 +437,42 @@ export function CustomersTab({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 15 }}
               transition={{ type: 'spring', duration: 0.4 }}
-              className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full text-right border border-slate-100 z-10 relative overflow-hidden transition-colors"
+              className="bg-white rounded-[26px] p-5 shadow-2xl max-w-[320px] w-full text-right border border-slate-100 z-10 relative overflow-hidden transition-colors"
               dir="rtl"
             >
-              {/* Top Accent Bar */}
-              <div className={`absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-l ${
-                confirmDialog.variant === 'warning' || confirmDialog.variant === 'info'
-                  ? 'from-amber-400 via-amber-500 to-indigo-500'
-                  : 'from-rose-500 via-amber-500 to-rose-600'
-              }`} />
-
               {/* Header Icon + Title */}
-              <div className="flex items-center gap-3 mb-5 mt-2">
-                <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 transition-colors ${
+              <div className="flex flex-col items-center gap-3 mb-4 text-center">
+                <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 transition-colors ${
                   confirmDialog.variant === 'warning' || confirmDialog.variant === 'info'
                     ? 'bg-amber-50 border-amber-100 text-amber-600'
                     : 'bg-rose-50 border-rose-100 text-rose-600'
                 }`}>
                   {confirmDialog.variant === 'warning' || confirmDialog.variant === 'info' ? (
-                    <Archive className="w-5 h-5 animate-pulse" />
+                    <Archive className="w-5 h-5" />
                   ) : (
                     <AlertCircle className="w-5 h-5 animate-pulse" />
                   )}
                 </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 leading-tight transition-colors">
-                    {confirmDialog.title}
-                  </h3>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1 transition-colors">
-                    إجراء حساس يتطلب التحقق لضمان الدقة
-                  </p>
-                </div>
+                <h3 className="text-sm font-black text-slate-800 leading-tight">
+                  {confirmDialog.title}
+                </h3>
               </div>
 
               {/* Message */}
               {confirmDialog.message && (
-                <p className="text-xs text-slate-600 font-medium leading-relaxed mb-6 bg-slate-50 border border-slate-100 rounded-xl p-3 text-center transition-colors">
+                <p className="text-[11px] text-slate-500 font-bold leading-relaxed mb-4 bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
                   {confirmDialog.message}
                 </p>
               )}
 
-              {/* Transaction / Customer Structured Details */}
+              {/* Transaction / Customer Details */}
               {confirmDialog.details && (
-                <div className="mb-5 space-y-3">
-                  <div className="text-center p-3.5 bg-slate-50 border border-slate-100 rounded-2xl transition-colors">
-                    <span className="text-[9px] font-bold text-slate-400 block mb-1">
-                      {confirmDialog.details.type === 'customer' ? 'الاسم الكامل للعميل المراد حذفه' : 'القيمة المالية المسجلة بالقيد'}
+                <div className="mb-4 space-y-2.5">
+                  <div className="text-center p-3 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <span className="text-[8px] font-black text-slate-400 block mb-0.5 uppercase">
+                      {confirmDialog.details.type === 'customer' ? 'الاسم الكامل للعميل المراد حذفه' : 'القيمة المالية المسجلة'}
                     </span>
-                    <span className={`text-base font-black transition-colors ${
+                    <span className={`text-[13px] font-black ${
                       confirmDialog.details.type === 'debt' 
                         ? 'text-rose-600' 
                         : confirmDialog.details.type === 'payment' 
@@ -493,29 +481,21 @@ export function CustomersTab({
                     }`}>
                       {confirmDialog.details.amountLabel}
                     </span>
-                    {confirmDialog.details.secondaryLabel && (
-                      <span className="text-[10px] font-black text-slate-500 block mt-1.5 bg-white border border-slate-200/40 rounded-full py-0.5 px-3.5 inline-block mx-auto shadow-xs transition-colors">
-                        {confirmDialog.details.secondaryLabel}
-                      </span>
-                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-1.5 text-[11px] font-bold text-slate-600 bg-slate-50/40 rounded-xl p-1 transition-colors">
+                  <div className="grid grid-cols-1 gap-1 text-[10px] font-black text-slate-600 bg-slate-50/40 rounded-xl p-1">
                     {confirmDialog.details.dateLabel && (
-                      <div className="flex items-center justify-between p-2 hover:bg-white rounded-lg transition-all">
-                        <span className="text-slate-400 font-medium select-none">
-                          {confirmDialog.details.type === 'customer' ? 'رقم الهاتف:' : 'تاريخ القيد:'}
+                      <div className="flex items-center justify-between p-1.5 hover:bg-white rounded-lg transition-all">
+                        <span className="text-slate-400 font-bold select-none text-[9px]">
+                          {confirmDialog.details.type === 'customer' ? 'الجوال:' : 'التاريخ:'}
                         </span>
                         <span>{confirmDialog.details.dateLabel}</span>
                       </div>
                     )}
                     {confirmDialog.details.notesLabel && (
-                      <div className="p-2 hover:bg-white rounded-lg transition-all border border-dashed border-slate-100 mt-1">
-                        <span className="text-slate-400 font-medium block mb-1 select-none text-right">
-                          بيان الملاحظة الموثقة:
-                        </span>
-                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed bg-slate-100/30 rounded-lg p-2 text-right transition-colors">
-                          {confirmDialog.details.notesLabel}
+                      <div className="p-2 hover:bg-white rounded-lg transition-all border border-dashed border-slate-100 mt-0.5">
+                        <p className="text-[9px] text-slate-500 font-black leading-tight text-right italic">
+                          "{confirmDialog.details.notesLabel}"
                         </p>
                       </div>
                     )}
@@ -523,24 +503,11 @@ export function CustomersTab({
                 </div>
               )}
 
-              {/* Security warning notice */}
-              <div className={`text-[9px] font-bold border rounded-xl p-2.5 text-center mb-5 transition-colors ${
-                confirmDialog.variant === 'warning' || confirmDialog.variant === 'info'
-                  ? 'text-amber-600 bg-amber-50/30 border-amber-100/30'
-                  : 'text-rose-500 bg-rose-50/30 border-rose-100/30'
-              }`}>
-                {confirmDialog.variant === 'warning' || confirmDialog.variant === 'info' ? (
-                  <>💡 سيتم نقل هذه العمليات للأرشيف ولا يمكن التراجع عنها إلا عبر الإعدادات المتقدمة.</>
-                ) : (
-                  <>⚠️ تنبيه: بمجرد التأكيد، سيتم حذف السجل نهائياً وتحديث كافة التقارير والحسابات المرتبطة تلقائياً.</>
-                )}
-              </div>
-
               {/* Actions Footer */}
-              <div className="flex gap-2.5">
+              <div className="flex gap-2">
                 <button 
                   onClick={() => setConfirmDialog(null)}
-                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200/50 hover:border-slate-300 text-slate-700 font-bold rounded-xl text-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center"
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-500 font-black rounded-xl text-[10px] transition-all cursor-pointer text-center"
                 >
                   إلغاء
                 </button>
@@ -549,7 +516,7 @@ export function CustomersTab({
                     confirmDialog.onConfirm();
                     setConfirmDialog(null);
                   }}
-                  className={`flex-1 py-2 text-white font-bold rounded-xl text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center ${
+                  className={`flex-1 py-2.5 text-white font-black rounded-xl text-[10px] shadow-xs transition-all cursor-pointer text-center ${
                     confirmDialog.variant === 'warning' || confirmDialog.variant === 'info'
                       ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20'
                       : 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20'
@@ -563,17 +530,17 @@ export function CustomersTab({
         )}
       </AnimatePresence>
       {/* LEFT COLUMN: CUSTOMERS DIRECTORY */}
-      <div className={`lg:col-span-1 space-y-4 ${selectedCustomerId ? 'hidden lg:block' : 'block'}`}>
+      <div className={`lg:col-span-1 space-y-3 ${selectedCustomerId ? 'hidden lg:block' : 'block'}`}>
         {/* Actions & Filters Header */}
-        <div className="flex flex-col gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-xs">
+        <div className="flex flex-col gap-2.5 p-3.5 bg-white rounded-2xl border border-slate-100 shadow-xs">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-800">قائمة العملاء ({filteredCustomers.length})</h3>
+            <h3 className="text-xs font-black text-slate-800">العملاء ({filteredCustomers.length})</h3>
             <button
               onClick={onAddCustomerTrigger}
-              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-3.5 rounded-xl transition-all cursor-pointer"
+              className="flex items-center gap-1.5 text-[10px] font-black text-white bg-indigo-600 hover:bg-indigo-700 py-1.5 px-3 rounded-xl transition-all cursor-pointer"
             >
-              <UserPlus className="w-4 h-4" />
-              عميل جديد
+              <UserPlus className="w-3.5 h-3.5" />
+              جديد
             </button>
           </div>
 
@@ -581,22 +548,22 @@ export function CustomersTab({
           <div className="relative">
             <input
               type="text"
-              placeholder="ابحث بالاسم، برقم الهاتف، أو الملاحظات..."
+              placeholder="بحث..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all text-right placeholder-slate-400 font-medium"
+              className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all text-right placeholder-slate-400 font-bold"
             />
-            <Search className="w-4 h-4 absolute inset-y-0 right-3.5 flex items-center my-auto text-slate-400 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 absolute inset-y-0 right-3 flex items-center my-auto text-slate-400 pointer-events-none" />
             {searchQuery ? (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 left-3 flex items-center my-auto text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded-full hover:bg-slate-200/55 cursor-pointer animate-fade-in"
+                className="absolute inset-y-0 left-2.5 flex items-center my-auto text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded-full hover:bg-slate-200/55 cursor-pointer animate-fade-in"
                 title="مسح البحث"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3 h-3" />
               </button>
             ) : (
-              <Sparkles className="w-3.5 h-3.5 absolute inset-y-0 left-3.5 my-auto text-indigo-400 pointer-events-none" />
+              <Sparkles className="w-3 h-3 absolute inset-y-0 left-3 my-auto text-indigo-400 pointer-events-none" />
             )}
           </div>
 
@@ -685,11 +652,11 @@ export function CustomersTab({
         </div>
 
         {/* Dynamic Customers List */}
-        <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+        <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1 no-scrollbar">
           {filteredCustomers.length === 0 ? (
-            <div className="p-8 text-center bg-white rounded-2xl border border-slate-100 text-slate-400 text-xs">
-              <AlertCircle className="w-8 h-8 text-slate-350 mx-auto mb-2" />
-              لا يوجد عملاء يطابقون خيارات البحث الحالية.
+            <div className="p-6 text-center bg-white rounded-2xl border border-slate-100 text-slate-400 text-[10px]">
+              <AlertCircle className="w-6 h-6 text-slate-350 mx-auto mb-2" />
+              لا توجد نتائج.
             </div>
           ) : (
             <AnimatePresence mode="popLayout">
@@ -699,70 +666,46 @@ export function CustomersTab({
                 const queryNormalized = searchQuery.trim().toLowerCase();
                 const nameMatch = queryNormalized && item.customer.name.toLowerCase().includes(queryNormalized);
                 const phoneMatch = queryNormalized && item.customer.phone.includes(queryNormalized);
-                const notesMatch = queryNormalized && item.customer.notes && item.customer.notes.toLowerCase().includes(queryNormalized);
 
                 return (
                   <motion.div
                     key={item.customer.id}
                     layoutId={`client-card-${item.customer.id}`}
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.96 }}
-                    transition={{ duration: 0.2, delay: Math.min(idx * 0.015, 0.15), ease: "easeOut" }}
-                    whileHover={{ scale: 1.01, x: -1 }}
-                    whileTap={{ scale: 0.995 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.15, delay: Math.min(idx * 0.01, 0.1), ease: "easeOut" }}
+                    whileHover={{ x: -2 }}
                     style={{ willChange: "transform, opacity" }}
                     onClick={() => setSelectedCustomerId(item.customer.id)}
-                    className={`p-4 bg-white rounded-2xl border cursor-pointer flex items-center justify-between group transition-[border-color,background-color] duration-150 ${
+                    className={`p-3 bg-white rounded-2xl border cursor-pointer flex items-center justify-between group transition-all duration-150 ${
                       isSelected 
-                        ? 'border-indigo-500 bg-indigo-50/10 shadow-xs' 
+                        ? 'border-indigo-500 bg-indigo-50/20 shadow-xs' 
                         : 'border-slate-100 shadow-2xs hover:border-slate-200'
                     }`}
                   >
-                    <div className="space-y-1.5 text-right flex-1 min-w-0 pr-1">
-                      <h4 className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors flex items-center gap-1.5">
+                    <div className="space-y-1 text-right flex-1 min-w-0 pr-1">
+                      <h4 className="text-[11px] font-black text-slate-700 truncate group-hover:text-indigo-600 transition-colors flex items-center gap-1">
                         {item.customer.name}
                         {nameMatch && (
-                          <span className="bg-indigo-50 border border-indigo-100/50 text-indigo-600 px-1 py-0.5 rounded text-[8px] font-black shrink-0 scale-90">الاسم</span>
+                          <span className="bg-indigo-50 text-indigo-600 px-1 rounded text-[7px] font-black scale-90">بحث</span>
                         )}
                       </h4>
-                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400 font-medium">
-                        <span>{item.customer.phone}</span>
+                      <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-bold overflow-hidden">
+                        <span className="truncate">{item.customer.phone}</span>
                         {item.customer.region && (
-                          <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md font-bold text-[8px] flex items-center gap-0.5" title="المنطقة أو المدينة">
-                            <MapPin className="w-2.5 h-2.5 text-indigo-500" />
-                            {item.customer.region}
-                          </span>
-                        )}
-                        {item.customer.classification && (
-                          <span className={`px-1.5 py-0.5 rounded-md font-bold text-[8px] ${
-                            item.customer.classification === 'distinct' ? 'bg-indigo-50 text-indigo-600' :
-                            item.customer.classification === 'struggling' ? 'bg-rose-50 text-rose-600' :
-                            'bg-emerald-50 text-emerald-600'
-                          }`}>
-                            {item.customer.classification === 'distinct' ? 'مميز' : item.customer.classification === 'struggling' ? 'متعثر' : 'جديد'}
+                          <span className="text-indigo-500 truncate" title="المنطقة">
+                             • {item.customer.region}
                           </span>
                         )}
                         {item.isOverdue && (
-                          <span className="bg-amber-50 text-amber-600 px-1 py-0.5 rounded-sm font-bold text-[8px]">فات الاستحقاق</span>
-                        )}
-                        {sortType === 'oldest_debt' && item.remainingDebt > 0 && item.oldestDebtDate !== '9999-12-31' && (
-                          <span className="bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-sm font-bold text-[8px] tracking-tight">
-                            أقدم مستحق: {item.oldestDebtDate}
-                          </span>
-                        )}
-                        {phoneMatch && (
-                          <span className="bg-blue-50 border border-blue-100/50 text-blue-600 px-1 py-0.5 rounded-md font-bold text-[8px] tracking-tight">رقم مطابق</span>
-                        )}
-                        {notesMatch && (
-                          <span className="bg-purple-50 border border-purple-100/50 text-purple-600 px-1 py-0.5 rounded-md font-bold text-[8px] tracking-tight truncate max-w-[100px]" title={item.customer.notes}>ملاحظة مطابقة</span>
+                          <span className="text-amber-600 font-black shrink-0">! متأخر</span>
                         )}
                       </div>
                     </div>
                     
                     <div className="text-left shrink-0 pl-1">
-                      <span className="text-[10px] text-slate-400 block font-semibold mb-0.5">المتبقي</span>
-                      <span className={`text-xs font-black ${
+                      <span className={`text-[11px] font-black ${
                         item.remainingDebt > 0 ? 'text-rose-600' : 'text-emerald-600'
                       }`}>
                         {formatCurrency(item.remainingDebt)}
@@ -820,86 +763,83 @@ export function CustomersTab({
               </button>
 
             {/* Profile Info Header */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-5 border-b border-slate-100 gap-4">
-              <div className="space-y-1.5 text-right">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md font-bold">بطاقة عميل</span>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-4 border-b border-slate-100 gap-3">
+              <div className="space-y-1 text-right">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-md font-black uppercase">بطاقة حساب</span>
                   {activeCustomerInfo.customer.region && (
-                    <span className="text-[10px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-md font-bold flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                    <span className="text-[9px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded-md font-black flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-indigo-400" />
                       {activeCustomerInfo.customer.region}
                     </span>
                   )}
                 </div>
-                <h3 className="text-base font-bold text-slate-800">{activeCustomerInfo.customer.name}</h3>
+                <h3 className="text-sm font-black text-slate-800">{activeCustomerInfo.customer.name}</h3>
                 
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-400 font-bold">
                   <div className="flex items-center gap-1" dir="ltr">
-                    <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <Phone className="w-3 h-3 text-slate-300 shrink-0" />
                     <span>{activeCustomerInfo.customer.phone}</span>
                   </div>
-                  {activeCustomerInfo.customer.email && (
-                    <div className="flex items-center gap-1" dir="ltr">
-                      <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>{activeCustomerInfo.customer.email}</span>
-                    </div>
-                  )}
                   <div className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>انضم: {formatDate(activeCustomerInfo.customer.createdAt)}</span>
+                    <Calendar className="w-3 h-3 text-slate-300 shrink-0" />
+                    <span>تاريخ الانضمام: {formatDate(activeCustomerInfo.customer.createdAt)}</span>
                   </div>
                 </div>
               </div>
 
               {/* Edit / Delete profile control center */}
               <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 self-start md:self-center">
+                <div className="flex items-center gap-1.5 self-start md:self-center">
                   <button
                     onClick={handlePrint}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-all cursor-pointer print:hidden"
+                    className="flex items-center gap-1 px-3 py-1 text-[10px] font-black bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-all cursor-pointer print:hidden shadow-xs"
                   >
-                    <Printer className="w-3.5 h-3.5" />
-                    طباعة
+                    <Printer className="w-3 h-3" />
+                    طـبـاعـة
                   </button>
                   <button
                     onClick={() => onEditCustomerTrigger(activeCustomerInfo.customer)}
-                    className="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all cursor-pointer print:hidden"
+                    className="px-3 py-1 text-[10px] font-black bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all cursor-pointer print:hidden border border-slate-100"
                   >
-                    تعديل الملف
+                    تعديل
                   </button>
                   {isManagerOrAssistant && (
                     <button
                       onClick={() => handleDeleteCustomerClicked(activeCustomerInfo.customer.id, activeCustomerInfo.customer.name)}
-                      className="p-2 bg-red-50 hover:bg-red-150 text-red-600 rounded-xl transition-all cursor-pointer print:hidden"
-                      title="حذف العميل نهائياً"
+                      className="p-1 px-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-all cursor-pointer print:hidden"
+                      title="حذف"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center gap-2 print:hidden">
+                <div className="flex flex-wrap items-center gap-1.5 print:hidden">
                   <button
                     onClick={() => setShowPayments(!showPayments)}
-                    className={`px-3 py-1 text-[10px] sm:text-xs rounded-full transition-all border font-black flex items-center gap-1 ${
+                    className={`px-2 py-0.5 text-[9px] rounded-full transition-all border font-black flex items-center gap-1 ${
                       showPayments 
-                        ? 'bg-emerald-500 text-white border-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105' 
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-600 shadow-sm'
+                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs' 
+                        : 'bg-white text-slate-400 border-slate-200'
                     }`}
                   >
-                    <div className={`w-1.5 h-1.5 rounded-full ${showPayments ? 'bg-white animate-pulse' : 'bg-emerald-500'}`} />
-                    {showPayments ? 'إخفاء الدفعات' : 'عرض الدفعات'}
+                    {showPayments ? 'إخفاء المقبوضات' : 'عرض المقبوضات'}
                   </button>
                   <button
                     onClick={() => setShowWithdrawals(!showWithdrawals)}
-                    className={`px-3 py-1 text-[10px] sm:text-xs rounded-full transition-all border font-black flex items-center gap-1 ${
+                    className={`px-2 py-0.5 text-[9px] rounded-full transition-all border font-black flex items-center gap-1 ${
                       showWithdrawals 
-                        ? 'bg-rose-500 text-white border-rose-600 shadow-[0_0_15px_rgba(244,63,94,0.4)] scale-105' 
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-rose-300 hover:text-rose-600 shadow-sm'
+                        ? 'bg-rose-600 text-white border-rose-700 shadow-xs' 
+                        : 'bg-white text-slate-400 border-slate-200'
                     }`}
                   >
-                    <div className={`w-1.5 h-1.5 rounded-full ${showWithdrawals ? 'bg-white animate-pulse' : 'bg-rose-500'}`} />
-                    {showWithdrawals ? 'إخفاء السحوبات' : 'عرض السحوبات'}
+                    {showWithdrawals ? 'إخفاء المسحوبات' : 'عرض المسحوبات'}
                   </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-1.5 print:hidden">
                   <button
                     onClick={() => setShowArchived(!showArchived)}
                     className={`px-3 py-1 text-[10px] sm:text-xs rounded-full transition-all border font-black flex items-center gap-1 ${
@@ -946,8 +886,6 @@ export function CustomersTab({
                       عرض المزيد
                     </button>
                   )}
-                </div>
-              </div>
             </div>
 
             <div className="mt-4 mb-4">

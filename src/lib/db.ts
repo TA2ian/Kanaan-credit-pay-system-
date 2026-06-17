@@ -75,20 +75,12 @@ const DEBTS_KEY = 'kanaan_debts_v1';
 const PAYMENTS_KEY = 'kanaan_payments_v1';
 const STORAGE_KEY = 'daftar_al_duyun_db';
 
-// عينة البيانات التجريبية الافتراضية
-const SAMPLE_CUSTOMERS: Customer[] = [
-  { id: 'cust-1', name: 'سوبرماركت الياسمين (أبو محمد)', phone: '+963933111222', region: 'دمشق القديم - باب توما', totalDebt: 950, createdAt: '2026-04-10T10:00:00Z' },
-  { id: 'cust-2', name: 'بقالة الخير والبركة (هاني المصري)', phone: '+963955666777', region: 'الميدان - الشارع العام', totalDebt: 450, createdAt: '2026-04-15T11:30:00Z' }
-];
-
 export function getDatabase(): DatabaseState {
-    if (typeof window === 'undefined') return { version: 1, customers: [], transactions: [] };
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : { version: 1, customers: [], transactions: [] };
+    return { version: 1, customers: [], transactions: [] };
 }
 
 export function saveDatabase(state: DatabaseState): void {
-  if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  // Deprecated for Firebase
 }
 
 function isClient(): boolean {
@@ -96,16 +88,11 @@ function isClient(): boolean {
 }
 
 export function initializeDatabase(forceReset = false) {
-  if (!isClient()) return;
-  if (forceReset || !localStorage.getItem(CUSTOMERS_KEY)) {
-    localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(SAMPLE_CUSTOMERS));
-  }
+  // Deprecated for Firebase
 }
 
 export function getCustomers(): Customer[] {
-  if (!isClient()) return [];
-  initializeDatabase();
-  return JSON.parse(localStorage.getItem(CUSTOMERS_KEY) || '[]');
+  return [];
 }
 
 export function saveCustomers(customers: Customer[]) {

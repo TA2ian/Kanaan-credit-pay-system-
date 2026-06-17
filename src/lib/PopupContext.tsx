@@ -137,7 +137,7 @@ export function PopupProvider({ children }: { children: React.ReactNode }) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 15 }}
               transition={{ type: 'spring', duration: 0.4 }}
-              className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full text-right border border-slate-100 z-10 relative overflow-hidden"
+              className="bg-white rounded-[28px] p-6 shadow-2xl max-w-sm w-full text-right border border-slate-100 z-10 relative overflow-hidden"
               dir="rtl"
             >
               {/* Top accent line */}
@@ -145,8 +145,8 @@ export function PopupProvider({ children }: { children: React.ReactNode }) {
 
               {/* Icon & title summary */}
               <div className="flex items-center gap-3 mb-4 mt-2">
-                <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${activeAlert.headerBg}`}>
-                  <AlertIcon className="w-5 h-5" />
+                <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 ${activeAlert.headerBg}`}>
+                  <AlertIcon className="w-6 h-6" />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-800 leading-tight">
@@ -159,16 +159,16 @@ export function PopupProvider({ children }: { children: React.ReactNode }) {
               </div>
 
               {/* Msg Content */}
-              <p className="text-xs text-slate-600 font-medium leading-relaxed mb-5 bg-slate-50 border border-slate-100 rounded-xl p-3 text-center whitespace-pre-line">
+              <p className="text-xs text-slate-600 font-bold leading-relaxed mb-6 bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center whitespace-pre-line shadow-inner-sm">
                 {alertState.message}
               </p>
 
               {/* Action Button */}
               <button
                 onClick={handleAlertClose}
-                className={`w-full py-2 px-4 text-white font-bold rounded-xl text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center ${activeAlert.btnClass}`}
+                className={`w-full py-3 px-4 text-white font-black rounded-2xl text-xs shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center ${activeAlert.btnClass}`}
               >
-                موافق
+                موافق، فهمت ذلك
               </button>
             </motion.div>
           </div>
@@ -194,7 +194,7 @@ export function PopupProvider({ children }: { children: React.ReactNode }) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 15 }}
               transition={{ type: 'spring', duration: 0.4 }}
-              className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full text-right border border-slate-100 z-10 relative overflow-hidden"
+              className="bg-white rounded-[28px] p-6 shadow-2xl max-w-sm w-full text-right border border-slate-100 z-10 relative overflow-hidden"
               dir="rtl"
             >
               {/* Top accent line */}
@@ -205,15 +205,15 @@ export function PopupProvider({ children }: { children: React.ReactNode }) {
               }`} />
 
               {/* Icon & title summary */}
-              <div className="flex items-center gap-3 mb-4 mt-2">
-                <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${
+              <div className="flex items-center gap-4 mb-4 mt-2 text-right">
+                <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 shadow-sm ${
                   confirmState.isDanger 
                     ? 'bg-rose-50 border-rose-100 text-rose-600' 
                     : 'bg-indigo-50 border-indigo-100 text-indigo-600'
                 }`}>
-                  <HelpCircle className="w-5 h-5" />
+                  <HelpCircle className="w-6 h-6" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <h3 className="text-sm font-black text-slate-800 leading-tight">
                     {confirmState.title}
                   </h3>
@@ -224,21 +224,21 @@ export function PopupProvider({ children }: { children: React.ReactNode }) {
               </div>
 
               {/* Msg Content */}
-              <p className="text-xs text-slate-600 font-medium leading-relaxed mb-5 bg-slate-50 border border-slate-100 rounded-xl p-3 text-center whitespace-pre-line">
+              <p className="text-xs text-slate-600 font-bold leading-relaxed mb-6 bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center whitespace-pre-line shadow-inner-sm">
                 {confirmState.message}
               </p>
 
               {/* Footer actions */}
-              <div className="flex gap-2.5">
+              <div className="flex gap-3">
                 <button
                   onClick={handleConfirmCancel}
-                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200/50 hover:border-slate-300 text-slate-700 font-bold rounded-xl text-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center"
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 border border-slate-200/50 hover:border-slate-300 text-slate-700 font-black rounded-2xl text-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center"
                 >
                   {confirmState.cancelText || 'إلغاء'}
                 </button>
                 <button
                   onClick={handleConfirmOk}
-                  className={`flex-1 py-2 text-white font-bold rounded-xl text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center ${
+                  className={`flex-1 py-3 text-white font-black rounded-2xl text-xs shadow-md hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-center ${
                     confirmState.isDanger
                       ? 'bg-rose-600 hover:bg-rose-700'
                       : 'bg-indigo-600 hover:bg-indigo-700'

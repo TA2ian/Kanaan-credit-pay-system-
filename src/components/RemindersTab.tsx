@@ -60,36 +60,71 @@ export function RemindersTab({ db }: RemindersTabProps) {
     return activeDebtors.find(d => d.customer.id === selectedCustomerId) || null;
   }, [activeDebtors, selectedCustomerId]);
 
-  // 1. Predefined standard templates (قوالب سريعة جاهزة بدون ذكاء اصطناعي)
+  // 1. Predefined standard templates (قوالب سريعة جاهزة مصنفة)
   const templates = useMemo(() => {
     if (!selectedDebtorBalance) return [];
     const name = selectedDebtorBalance.customer.name;
     const amountStr = formatCurrency(selectedDebtorBalance.remainingDebt);
     const delName = profile?.delegateName || 'عبدالرحمن كنعان';
+    const isOverdue = selectedDebtorBalance.isOverdue;
     
-    return [
+    const collection = [
       {
-        id: 'tmpl-1',
-        name: 'تذكير ودي سريع',
+        id: 'tmpl-friendly',
+        category: 'ودي',
+        name: 'تذكير ودي بسيط',
         text: `السلام عليكم ورحمة الله وبركاته أخ ${name}، أتمنى أن تكون بصحة وعافية. تذكير لطيف وسريع بأن رصيد حسابك المتبقي المعتمد لدينا يبلغ ${amountStr}. يرجى مراجعته وتسديده عند تيسر الأمر لكم. شكراً جزيلاً لتعاملك الطيب وثقتك الغالية.`,
       },
       {
-        id: 'tmpl-2',
-        name: 'طلب إلحاقي محدد',
-        text: `السلام عليكم أخي الفاضل ${name}، بخصوص المعاملات الأخيرة المتفق عليها لدينا، رصدنا متبقياً مالياً قدره ${amountStr} مستحق الدفع للتسوية. نتمنى تجهيز المبلغ أو تفضلكم بزيارتنا في أقرب فرصة لإغلاق الدفتر المالي الحالي. شاكرين ومقدرين حسن تعاونكم المعتاد.`,
+        id: 'tmpl-formal',
+        category: 'رسمي',
+        name: 'إخطار مالي رسمي',
+        text: `السادة ${name} المحترمين، تحية طيبة وبعد.. نفيدكم علماً بأن الرصيد المستحق في ذمتكم لصالح مؤسستنا قد بلغ ${amountStr}${selectedDebtorBalance.customer.createdAt ? ` والمقيد بتاريخ ${selectedDebtorBalance.customer.createdAt.split('T')[0]}` : ''}. نأمل منكم التكرم بجدولة سداد هذا المبلغ في أقرب وقت ممكن لاستمرار تزويدكم بالخدمات والبضائع كالمعتاد. شاكرين تعاونكم.`,
       },
       {
-        id: 'tmpl-3',
-        name: 'جدولة استحقاق عاجل',
-        text: `السلام عليكم ورحمة الله وبركاته، الأخ الكريم ${name}. يرجى التكرم بالعلم بأن مبلغ ${amountStr} المسجل بذمتكم قد تجاوز وقت السير المعتاد. نرجو التواصل لتأكيد تجهيز الدفعة أو جدولة موعد زيارة نهائي ليتسنى لمندوبنا ${delName} إغلاق القيود المحاسبية. جزاكم الله خيراً.`,
+        id: 'tmpl-followup',
+        category: 'متابعة',
+        name: 'متابعة بضاعة مستلمة',
+        text: `السلام عليكم أخي ${name}، بخصوص طلبية البضاعة الأخيرة، يبلغ المتبقي المالي منها ${amountStr}. نرجو تجهيز المبلغ ليتسنى لمندوبنا الاستلام أو تفضلكم بالتحويل. جزاكم الله خيراً.`,
       }
     ];
+
+    if (isOverdue) {
+      const lastActiveDate = selectedDebtorBalance.lastActive ? selectedDebtorBalance.lastActive.split('T')[0] : '';
+      collection.unshift({
+        id: 'tmpl-urgent',
+        category: 'مستعجل',
+        name: 'إنذار تأخير سداد',
+        text: `تنبيه عاجل: الأخ ${name}، نود إعلامكم بأن مبلغ ${amountStr} قد تجاوز تاريخ الاستحقاق المتفق عليه (تاريخ العملية: ${lastActiveDate}). نرجو سداد المتأخرات فوراً لتجنب إيقاف التعاملات مؤقتاً أو اتخاذ إجراءات إدارية أخرى. ننتظر ردكم خلال اليوم لتسوية الوضع المحاسبي.`,
+      });
+    }
+
+    return collection;
   }, [selectedDebtorBalance, profile]);
+
+  const [activeCategory, setActiveCategory] = useState<string>('الكل');
+  
+  const filteredTemplates = useMemo(() => {
+    if (activeCategory === 'الكل') return templates;
+    return templates.filter(t => t.category === activeCategory);
+  }, [templates, activeCategory]);
+
+  const categories = useMemo(() => {
+    const cats = ['الكل', ...new Set(templates.map(t => t.category))];
+    return cats;
+  }, [templates]);
 
   const handleApplyTemplate = (templateId: string, text: string) => {
     setSelectedTemplateId(templateId);
     setGeneratedMessage(text);
-    setGeneratedAdvice('تم استدعاء قالب للتذكير السريع والسهل.');
+    setGeneratedAdvice('تم اختيار قالب جاهز، يمكنك تعديله أو إرساله مباشرة.');
+  };
+
+  const handleQuickCopy = (e: React.MouseEvent, text: string) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   // 2. Generate with Gemini AI
@@ -174,22 +209,22 @@ export function RemindersTab({ db }: RemindersTabProps) {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 transition-colors">
       
       {/* 1. LEFT CONFIG PANE */}
-      <div className="lg:col-span-1 space-y-4">
-        <div className="p-5 bg-white rounded-2xl border border-slate-100 shadow-xs space-y-4 transition-colors">
-          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 transition-colors">
-            <MessageSquare className="w-4.5 h-4.5 text-emerald-600 transition-colors" />
+      <div className="lg:col-span-1 space-y-3">
+        <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-xs space-y-3.5 transition-colors">
+          <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 transition-colors">
+            <MessageSquare className="w-4 h-4 text-emerald-600 transition-colors" />
             تجهيز تذكير المستحقات
           </h3>
 
           {activeDebtors.length === 0 ? (
-            <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-xl transition-colors">
+            <div className="p-6 text-center text-slate-400 text-[10px] bg-slate-50 rounded-xl transition-colors">
               لا يوجد مدينين حالياً لإرسال مذكرات سداد إليهم! 👍
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {/* Select Customer */}
               <div>
-                <label className="block mb-1 text-xs font-bold text-slate-600 transition-colors">اختر العميل المطلوب:</label>
+                <label className="block mb-1 text-[10px] font-black text-slate-400 transition-colors uppercase">اختر العميل:</label>
                 <select
                   value={selectedCustomerId}
                   onChange={(e) => {
@@ -198,64 +233,93 @@ export function RemindersTab({ db }: RemindersTabProps) {
                     setGeneratedMessage('');
                     setGeneratedAdvice('');
                   }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors cursor-pointer"
+                  className="w-full px-3 py-2 text-[11px] font-black bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors cursor-pointer"
                 >
                   {activeDebtors.map((d) => (
                     <option key={d.customer.id} value={d.customer.id}>
-                      {d.customer.name} (متبقي: {formatCurrency(d.remainingDebt)})
+                      {d.customer.name} ({formatCurrency(d.remainingDebt)})
                     </option>
                   ))}
                 </select>
               </div>
 
               {selectedDebtorBalance && (
-                <div className="p-3 bg-rose-50/50 rounded-xl border border-rose-100/40 text-xs space-y-1 transition-colors">
-                  <div className="flex justify-between font-bold text-slate-700 transition-colors">
-                    <span>الرصيد المعلق السداد:</span>
-                    <span className="text-rose-600">{formatCurrency(selectedDebtorBalance.remainingDebt)}</span>
-                  </div>
-                  <div className="flex justify-between text-[10px] text-slate-400 font-medium transition-colors">
-                    <span>آخر حركة للتفاعل:</span>
-                    <span>{selectedDebtorBalance.lastActive.split('T')[0]}</span>
+                <div className="p-2.5 bg-rose-50/50 rounded-xl border border-rose-100/40 text-[10px] space-y-0.5 transition-colors">
+                  <div className="flex justify-between font-black text-slate-700 transition-colors">
+                    <span>المبلغ المتبقي:</span>
+                    <span className="text-rose-600 font-black">{formatCurrency(selectedDebtorBalance.remainingDebt)}</span>
                   </div>
                 </div>
               )}
 
-              <hr className="border-slate-100 transition-colors" />
+              <hr className="border-slate-50 transition-colors" />
 
-              {/* Quick Template Presets */}
-              <div className="space-y-2">
-                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide transition-colors">قوالب رسائل جاهزة سريعة:</span>
-                <div className="flex flex-col gap-1.5">
-                  {templates.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => handleApplyTemplate(t.id, t.text)}
-                      className={`text-right text-xs p-2.5 rounded-xl border transition-all cursor-pointer font-medium ${
-                        selectedTemplateId === t.id
-                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm'
-                          : 'bg-slate-50 hover:bg-slate-100 hover:text-indigo-700 border-slate-150 text-slate-700'
-                      }`}
-                    >
-                      📎 {t.name}
-                    </button>
-                  ))}
+              {/* Quick Template Presets with Categories */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="block text-[9px] font-black text-slate-400 uppercase tracking-wide transition-colors">قوالب جاهزة:</span>
+                  <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
+                    {categories.map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setActiveCategory(cat)}
+                        className={`px-2 py-0.5 rounded-lg text-[8px] font-black transition-all whitespace-nowrap cursor-pointer ${
+                          activeCategory === cat 
+                            ? 'bg-indigo-600 text-white' 
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pr-1 no-scrollbar">
+                  {filteredTemplates.length === 0 ? (
+                    <p className="text-[10px] text-slate-400 text-center py-4">لا توجد قوالب.</p>
+                  ) : (
+                    filteredTemplates.map((t) => (
+                      <div key={t.id} className="relative group">
+                        <button
+                          onClick={() => handleApplyTemplate(t.id, t.text)}
+                          className={`w-full text-right text-[10px] p-2 pl-8 rounded-xl border transition-all cursor-pointer font-black ${
+                            selectedTemplateId === t.id
+                              ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs'
+                              : 'bg-slate-50 hover:bg-slate-100 hover:text-indigo-700 border-slate-150 text-slate-600'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span className={`w-1 h-1 rounded-full ${
+                              t.category === 'مستعجل' ? 'bg-rose-500' : 
+                              t.category === 'رسمي' ? 'bg-sky-500' :
+                              t.category === 'ودي' ? 'bg-emerald-500' : 'bg-slate-400'
+                            }`} />
+                            {t.name}
+                          </span>
+                        </button>
+                        <button
+                          onClick={(e) => handleQuickCopy(e, t.text)}
+                          title="نسخ سريع"
+                          className="absolute left-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-indigo-600 rounded-lg transition-all cursor-pointer"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
-              <hr className="border-slate-100 transition-colors" />
-
-              {/* Spark smart generation configuration */}
-              <div className="space-y-3.5 bg-indigo-50/15 p-4 rounded-xl border border-indigo-100/30 transition-colors">
-                <span className="block text-xs font-bold text-indigo-800 flex items-center gap-1 transition-colors">
+              <div className="space-y-3 bg-indigo-50/20 p-3 rounded-xl border border-indigo-100/40 transition-colors">
+                <span className="block text-[10px] font-black text-indigo-800 flex items-center gap-1 transition-colors">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-600 transition-colors" />
-                  محرك صياغة مذكرات AI الذكي
+                  مساعد AI الذكي
                 </span>
 
                 {/* Tone select */}
                 <div>
-                  <label className="block mb-1 text-[10px] font-bold text-slate-600 transition-colors">نبرة وأسلوب الصياغة:</label>
-                  <div className="grid grid-cols-2 gap-1 text-[10px] font-bold">
+                  <div className="grid grid-cols-2 gap-1 text-[9px] font-black">
                     <button
                       onClick={() => setTone('friendly')}
                       className={`py-1.5 rounded-lg border text-center cursor-pointer transition-all ${
@@ -264,7 +328,7 @@ export function RemindersTab({ db }: RemindersTabProps) {
                           : 'bg-white text-slate-600 border-slate-200 hover:text-slate-800'
                       }`}
                     >
-                      😊 ودود ومعاتب
+                      😊 ودي
                     </button>
                     <button
                       onClick={() => setTone('firm')}
@@ -274,51 +338,20 @@ export function RemindersTab({ db }: RemindersTabProps) {
                           : 'bg-white text-slate-600 border-slate-200 hover:text-slate-800'
                       }`}
                     >
-                      🛡️ حازم ومتزن
-                    </button>
-                    <button
-                      onClick={() => setTone('formal')}
-                      className={`py-1.5 rounded-lg border text-center cursor-pointer transition-all ${
-                        tone === 'formal' 
-                          ? 'bg-sky-700 text-white border-sky-700 shadow-xs' 
-                          : 'bg-white text-slate-600 border-slate-200 hover:text-slate-800'
-                      }`}
-                    >
-                      💼 تجاري رسمي
-                    </button>
-                    <button
-                      onClick={() => setTone('urgent')}
-                      className={`py-1.5 rounded-lg border text-center cursor-pointer transition-all ${
-                        tone === 'urgent' 
-                          ? 'bg-rose-700 text-white border-rose-700 shadow-xs' 
-                          : 'bg-white text-slate-600 border-slate-200 hover:text-slate-800'
-                      }`}
-                    >
-                      ⏳ عاجل جداً
+                      🛡️ حازم
                     </button>
                   </div>
-                </div>
-
-                {/* Custom Notes */}
-                <div>
-                  <label className="block mb-1 text-[10px] font-bold text-slate-600 transition-colors">ملاحظات إضافية يدمجها الذكاء الاصطناعي (اختياري)</label>
-                  <input
-                    type="text"
-                    placeholder="مثال: خصم ٢٠٠ رس إذا دفع هذا الأسبوع"
-                    value={customNotes}
-                    onChange={(e) => setCustomNotes(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-hidden focus:border-indigo-500 transition-colors"
-                  />
                 </div>
 
                 <button
                   type="button"
                   onClick={handleGenerateAI}
                   disabled={isGenerating || !selectedCustomerId}
-                  className="w-full py-2 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-indigo-800 hover:opacity-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm shadow-indigo-200"
+                  className="w-full py-2 px-3 rounded-xl text-[10px] font-black text-white bg-indigo-600 hover:bg-indigo-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
+                  style={{ backgroundColor: 'var(--brand-color)' }}
                 >
-                  <Sparkles className="w-4 h-4" />
-                  {isGenerating ? 'جاري صياغة النص بـ AI...' : 'صياغة التنبيه بالذكاء الاصطناعي'}
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {isGenerating ? 'جاري الصياغة...' : 'صياغة بـ AI'}
                 </button>
               </div>
 

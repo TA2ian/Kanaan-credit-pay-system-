@@ -111,7 +111,7 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
             onClick={onClose}
           />
           <motion.div 
-            className="w-full max-w-md overflow-hidden bg-white rounded-2xl shadow-xl border border-slate-100 relative z-10"
+            className="w-full max-w-md overflow-hidden bg-white rounded-[28px] shadow-2xl border border-slate-100 relative z-10"
             initial={{ scale: 0.95, y: 15, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.95, y: 15, opacity: 0 }}
@@ -119,24 +119,24 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
             transition={{ type: "spring", duration: 0.4, bounce: 0.15 }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                <UserPlus className="w-4.5 h-4.5 text-emerald-600" />
+            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-100 transition-colors">
+              <h3 className="text-lg font-black text-slate-800 flex items-center gap-2.5 tracking-tight">
+                <UserPlus className="w-5 h-5 text-indigo-600" style={{ color: 'var(--brand-color)' }} />
                 {customer ? 'تعديل بيانات العميل' : 'إضافة عميل جديد'}
               </h3>
               <button 
                 type="button"
                 onClick={onClose}
-                className="p-1 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                className="p-1.5 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Content */}
-            <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
+            <form onSubmit={handleSubmit} className="p-6 space-y-3.5 custom-scrollbar max-h-[80vh] overflow-y-auto">
               {error && (
-                <div className="p-2.5 text-[11px] font-semibold text-red-600 bg-red-50 rounded-xl border border-red-100">
+                <div className="p-3.5 text-xs font-bold text-rose-600 bg-rose-50 rounded-2xl border border-rose-100 shadow-inner-sm">
                   {error}
                 </div>
               )}
@@ -145,107 +145,113 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
                 <button
                   type="button"
                   onClick={handlePickContact}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2.5 py-3 px-4 bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-100 rounded-2xl text-[10px] font-black transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-xs"
                 >
-                  <Contact className="w-4 h-4" />
+                  <Contact className="w-4 h-4 text-indigo-600" style={{ color: 'var(--brand-color)' }} />
                   استيراد من جهات الاتصال
                 </button>
               )}
 
               <div className="space-y-3.5">
-                <div>
-                  <label className="block mb-1 text-[11px] font-bold text-slate-600">اسم العميل ثنائي أو ثلاثي *</label>
+                <div className="group">
+                  <label className="block mb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">اسم العميل بالكامل *</label>
                   <input
                     type="text"
                     placeholder="مثال: خالد بن أحمد الحامد"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
+                    className="w-full px-4 py-2.5 text-sm font-black bg-slate-50 border border-slate-200 rounded-2xl focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all shadow-xs"
+                    style={{ borderColor: 'var(--brand-color-soft)' }}
                     required
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block mb-1 text-[11px] font-bold text-slate-600">جوال الواتساب *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="group">
+                    <label className="block mb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">جوال الواتساب *</label>
                     <input
                       type="text"
                       placeholder="0958280936"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
+                      className="w-full px-4 py-2.5 text-sm font-black bg-slate-50 border border-slate-200 rounded-2xl focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all shadow-xs"
+                      style={{ borderColor: 'var(--brand-color-soft)' }}
                       dir="ltr"
                       required
                     />
                   </div>
-                  <div>
-                    <label className="block mb-1 text-[11px] font-bold text-slate-600">تصنيف العميل</label>
+                  <div className="group">
+                    <label className="block mb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">تصنيف العميل</label>
                     <select 
                       value={classification || ''}
                       onChange={(e) => setClassification(e.target.value as CustomerClassification || undefined)}
-                      className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
+                      className="w-full px-4 py-2.5 text-sm font-black bg-slate-50 border border-slate-200 rounded-2xl focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all appearance-none shadow-xs"
+                      style={{ borderColor: 'var(--brand-color-soft)' }}
                     >
-                      <option value="">غير مصنف</option>
-                      <option value="distinct">عميل مميز</option>
-                      <option value="struggling">عميل متعثر</option>
-                      <option value="new">عميل جديد</option>
+                      <option value="">-- غير مصنف --</option>
+                      <option value="distinct">🌟 عميل مميز</option>
+                      <option value="struggling">⚠️ عميل متعثر</option>
+                      <option value="new">🆕 عميل جديد</option>
                     </select>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block mb-1 text-[11px] font-bold text-slate-600">البريد (اختياري)</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="group">
+                    <label className="block mb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">البريد الإلكتروني</label>
                     <input
                       type="email"
                       placeholder="name@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
+                      className="w-full px-4 py-2.5 text-sm font-black bg-slate-50 border border-slate-200 rounded-2xl focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all shadow-xs"
+                      style={{ borderColor: 'var(--brand-color-soft)' }}
                       dir="ltr"
                     />
                   </div>
-                  <div>
-                    <label className="block mb-1 text-[11px] font-bold text-slate-600">المنطقة / الحي</label>
+                  <div className="group">
+                    <label className="block mb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">المنطقة / العنوان</label>
                     <input
                       type="text"
-                      placeholder="مثال: الحاضر..."
+                      placeholder="دمشق، الميدان..."
                       value={region}
                       onChange={(e) => setRegion(e.target.value)}
-                      className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
+                      className="w-full px-4 py-2.5 text-sm font-black bg-slate-50 border border-slate-200 rounded-2xl focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all shadow-xs"
+                      style={{ borderColor: 'var(--brand-color-soft)' }}
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block mb-1 text-[11px] font-bold text-slate-600">ملاحظات أو نوع النشاط</label>
+                <div className="group">
+                  <label className="block mb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">ملاحظات إضافية</label>
                   <textarea
-                    placeholder="اكتب أي ملاحظات حول العميل..."
+                    placeholder="اكتب أي ملاحظات فنية أو محاسبية حول العميل..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows={2}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors resize-none"
+                    className="w-full px-4 py-2.5 text-sm font-black bg-slate-50 border border-slate-200 rounded-2xl focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all resize-none shadow-xs"
+                    style={{ borderColor: 'var(--brand-color-soft)' }}
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-1">
+              <div className="flex items-center gap-3 pt-3">
                 <button
                   type="submit"
-                  className="flex-1 py-2 px-4 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer"
+                  className="flex-1 py-2.5 px-4 text-xs font-black text-white rounded-2xl shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                  style={{ backgroundColor: 'var(--brand-color)' }}
                 >
-                  حفظ وتأكيد
+                  حفظ البيانات
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 py-2 px-4 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                  className="px-6 py-2.5 text-xs font-black text-slate-500 bg-slate-100 hover:bg-slate-200 border border-slate-100 rounded-2xl transition-all cursor-pointer"
                 >
                   إلغاء
                 </button>
               </div>
             </form>
-
           </motion.div>
         </div>
       )}
@@ -319,7 +325,7 @@ export function TransactionModal({ isOpen, onClose, customers, customerId, custo
             onClick={onClose}
           />
           <motion.div 
-            className="w-full max-w-md overflow-hidden bg-white rounded-2xl shadow-xl border border-slate-100 relative z-10"
+            className="w-full max-w-md overflow-hidden bg-white rounded-[28px] shadow-2xl border border-slate-100 relative z-10"
             initial={{ scale: 0.95, y: 15, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.95, y: 15, opacity: 0 }}
@@ -327,116 +333,122 @@ export function TransactionModal({ isOpen, onClose, customers, customerId, custo
             transition={{ type: "spring", duration: 0.4, bounce: 0.15 }}
           >
             {/* Header */}
-            <div className={`flex items-center justify-between px-6 py-4 border-b border-slate-100 ${
+            <div className={`flex items-center justify-between px-6 py-5 border-b border-slate-100 transition-colors ${
               type === 'debt' ? 'bg-amber-50/70' : 'bg-emerald-50/70'
             }`}>
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <h3 className="text-lg font-black text-slate-800 flex items-center gap-2.5 tracking-tight">
                 {type === 'debt' ? (
                   <>
                     <PlusCircle className="w-5 h-5 text-amber-600" />
-                    <span className="text-amber-800">إضافة قيد دين جديد</span>
+                    <span className="text-amber-900">إضافة قيد دين جديد</span>
                   </>
                 ) : (
                   <>
                     <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                    <span className="text-emerald-800">تسجيل دفعة سداد مستلمة</span>
+                    <span className="text-emerald-900">تسجيل دفعة سداد مستلمة</span>
                   </>
                 )}
               </h3>
               <button 
                 type="button"
                 onClick={onClose}
-                className="p-1 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                className="p-1.5 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Content */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="text-xs text-slate-500 block">لصالح العميل:</span>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 custom-scrollbar max-h-[85vh] overflow-y-auto">
+              <div className="p-3.5 rounded-[22px] bg-slate-50 border border-slate-100 shadow-xs">
+                <span className="text-[9px] font-black text-slate-400 uppercase mb-0.5 block">لصالح العميل المستهدف:</span>
                 {customers ? (
                     <select 
                         value={selectedCustomerId}
                         onChange={(e) => setSelectedCustomerId(e.target.value)}
-                        className="w-full text-base font-bold text-slate-800 bg-transparent border-none focus:ring-0 p-0"
+                        className="w-full text-sm font-black text-indigo-700 bg-transparent border-none focus:ring-0 p-0 appearance-none cursor-pointer"
+                        style={{ color: 'var(--brand-color)' }}
                     >
-                        <option value="">اختر عميلاً من القائمة...</option>
+                        <option value="">-- اختر عميلاً من القائمة --</option>
                         {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 ) : (
-                    <span className="text-base font-bold text-slate-800">{customerName || '---'}</span>
+                    <span className="text-sm font-black text-slate-800">{customerName || '---'}</span>
                 )}
               </div>
 
               {error && (
-                <div className="p-3 text-xs font-semibold text-red-600 bg-red-50 rounded-xl border border-red-100">
+                <div className="p-3.5 text-xs font-bold text-rose-600 bg-rose-50 rounded-2xl border border-rose-100 shadow-sm">
                   {error}
                 </div>
               )}
 
-              <div>
-                <label className="block mb-1.5 text-xs font-bold text-slate-700">
-                  {type === 'debt' ? 'قيمة الدين الجديد (بالدولار $) *' : 'المبلغ المسدد الموثق (بالدولار $) *'}
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="0.00"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="w-full pl-3 pr-10 py-2.5 text-sm font-bold bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
-                    required
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400 text-xs font-bold">
-                    $
-                  </div>
-                </div>
-              </div>
-
-              {type === 'debt' && (
-                <div>
-                  <label className="block mb-1.5 text-xs font-bold text-slate-700">تاريخ استحقاق السداد المتوقع *</label>
+              <div className="space-y-3.5">
+                <div className="group">
+                  <label className="block mb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                    {type === 'debt' ? 'قيمة الدين الجديد ($) *' : 'المبلغ المدفوع ($) *'}
+                  </label>
                   <div className="relative">
                     <input
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
-                      className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
+                      type="number"
+                      step="any"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="w-full px-4 py-2.5 text-lg font-black text-slate-800 bg-slate-50 border border-slate-200 rounded-[20px] focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all shadow-xs"
+                      style={{ borderColor: 'var(--brand-color-soft)' }}
                       required
                     />
+                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-indigo-600 opacity-60" style={{ color: 'var(--brand-color)' }}>
+                      <DollarSign className="w-5 h-5" />
+                    </div>
                   </div>
                 </div>
-              )}
 
-              <div>
-                <label className="block mb-1.5 text-xs font-bold text-slate-700">بيان القيد / ملاحظات البيع</label>
-                <input
-                  type="text"
-                  placeholder={type === 'debt' ? 'ثمن مواد تجارية، صنف فلان، إلخ...' : 'سداد دفعة نقدية، تحويل بنكي حساب الراجحي، إلخ...'}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 focus:bg-white transition-colors"
-                />
+                {type === 'debt' && (
+                  <div className="group">
+                    <label className="block mb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">تاريخ استحقاق السداد *</label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        className="w-full px-4 py-2.5 text-sm font-black text-slate-700 bg-slate-50 border border-slate-200 rounded-[20px] focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all shadow-xs"
+                        style={{ borderColor: 'var(--brand-color-soft)' }}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="group">
+                  <label className="block mb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">البيان / ملاحظات العملية</label>
+                  <input
+                    type="text"
+                    placeholder={type === 'debt' ? 'ثمن مواد، صنف تجاري، طلبية...' : 'سداد نقدي، تحويل حساب، شيك...'}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full px-4 py-2.5 text-sm font-black text-slate-700 bg-slate-50 border border-slate-200 rounded-[20px] focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all shadow-xs"
+                    style={{ borderColor: 'var(--brand-color-soft)' }}
+                  />
+                </div>
               </div>
 
               <div className="flex items-center gap-3 pt-2">
                 <button
                   type="submit"
-                  className={`flex-1 py-2.5 px-4 text-sm font-bold text-white rounded-xl focus:ring-4 transition-all cursor-pointer ${
+                  className={`flex-1 py-3 px-6 text-xs font-black text-white rounded-[20px] shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
                     type === 'debt' 
-                      ? 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-100' 
-                      : 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-100'
+                      ? 'bg-amber-600 hover:bg-amber-700' 
+                      : 'bg-emerald-600 hover:bg-emerald-700'
                   }`}
                 >
-                  تأكيد وحفظ القيد
+                  حفظ القيد
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 py-2.5 px-4 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                  className="px-6 py-3 text-xs font-black text-slate-500 bg-slate-100 hover:bg-slate-200 border border-slate-100 rounded-[20px] transition-all cursor-pointer"
                 >
                   إلغاء
                 </button>

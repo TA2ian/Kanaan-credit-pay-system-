@@ -137,11 +137,21 @@ function AppContent() {
     teamMembers,
     customers, 
     transactions, 
+    isSyncing,
+    isOnline,
+    pendingSyncCount,
     addCustomerToFS, 
     updateCustomerInFS, 
     addTransactionToFS, 
     logOut 
   } = useFirebase();
+
+  // Determine active members (active in the last 5 minutes)
+  const activeMembersCount = React.useMemo(() => {
+    if (!teamMembers) return 0;
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    return teamMembers.filter(m => m.lastActive && m.lastActive > fiveMinutesAgo).length;
+  }, [teamMembers]);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -431,115 +441,126 @@ function AppContent() {
       `}} />
       
       {/* A. SIDEBAR NAVIGATION - VISIBLE ONLY ON DESKTOP */}
-      <aside className="w-68 bg-slate-950 text-white flex flex-col border-l border-slate-900 shrink-0 hidden md:flex sticky top-0 h-screen overflow-y-auto">
+      <aside className="w-64 bg-slate-950 text-white flex flex-col border-l border-slate-900 shrink-0 hidden md:flex sticky top-0 h-screen overflow-y-auto">
         {/* Branding */}
-        <div className="p-6 shrink-0 border-b border-slate-900 pb-5 bg-slate-950/50">
+        <div className="p-5 shrink-0 border-b border-slate-900 pb-4 bg-slate-950/50">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              {renderVisualIdentity('md')}
+              {renderVisualIdentity('sm')}
               <div>
-                <h1 className="text-xs font-black tracking-tight text-white leading-tight truncate max-w-[120px]">{businessName}</h1>
-                <span className="text-[10px] text-amber-500 font-bold block mt-0.5">حقيبة المندوب الذكية v1.5</span>
+                <h1 className="text-[11px] font-black tracking-tight text-white leading-tight truncate max-w-[120px]">{businessName}</h1>
+                <span className="text-[9px] text-amber-500 font-bold block mt-0.5">كنعان الذكية v1.5</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Dynamic Tenant Profile Block */}
-        <div className="p-4 mx-4 mt-4 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between gap-3 shrink-0">
+        <div className="p-3 mx-3 mt-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between gap-3 shrink-0">
           <div className="truncate text-right">
-            <span className="text-[9px] text-amber-500 font-bold block">{translateRole(profile?.role)}</span>
-            <span className="text-[11px] font-black text-slate-200 truncate block mt-0.5" title={profile?.delegateName || user.email || ''}>
+            <span className="text-[8px] text-amber-500 font-bold block">{translateRole(profile?.role)}</span>
+            <span className="text-[10px] font-black text-slate-200 truncate block mt-0.5" title={profile?.delegateName || user.email || ''}>
               {profile?.delegateName || user.email}
             </span>
           </div>
           <button 
             onClick={() => logOut()} 
-            className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-all cursor-pointer shrink-0"
+            className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-all cursor-pointer shrink-0"
             title="تسجيل الخروج"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Vertical Nav links */}
-        <div className="flex-grow p-4 space-y-1">
+        <div className="flex-grow p-3 space-y-1">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-right cursor-pointer ${
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[11px] font-black transition-all text-right cursor-pointer ${
               activeTab === 'dashboard'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
-            <LayoutDashboard className="w-4.5 h-4.5 shrink-0 opacity-90" />
-            <span>لوحة التحكم والتحليل</span>
+            <LayoutDashboard className="w-4 h-4 shrink-0 opacity-90" />
+            <span>لوحة التحكم</span>
           </button>
 
           <button
             onClick={() => setActiveTab('customers')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-right cursor-pointer ${
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[11px] font-black transition-all text-right cursor-pointer ${
               activeTab === 'customers'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
-            <Users className="w-4.5 h-4.5 shrink-0 opacity-90" />
-            <span>العملاء والدفعات ({db.customers.length})</span>
+            <Users className="w-4 h-4 shrink-0 opacity-90" />
+            <span>العملاء ({db.customers.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('reminders')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-right cursor-pointer ${
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[11px] font-black transition-all text-right cursor-pointer ${
               activeTab === 'reminders'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
-            <BellRing className="w-4.5 h-4.5 shrink-0 opacity-90" />
-            <span className="flex-1">التذكيرات وصياغة AI</span>
+            <BellRing className="w-4 h-4 shrink-0 opacity-90" />
+            <span className="flex-1">التذكيرات</span>
             {summary.overdueCount > 0 && (
-              <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
             )}
           </button>
 
           {showTeamTab && (
             <button
               onClick={() => setActiveTab('team')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-right cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[11px] font-black transition-all text-right cursor-pointer ${
                 activeTab === 'team'
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
             >
-              <UserCog className="w-4.5 h-4.5 shrink-0 opacity-90" />
-              <span>فريق العمل والصلاحيات</span>
+              <UserCog className="w-4 h-4 shrink-0 opacity-90" />
+              <span>فريق العمل</span>
             </button>
           )}
 
           <button
             onClick={() => setActiveTab('utilities')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-right cursor-pointer ${
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[11px] font-black transition-all text-right cursor-pointer ${
               activeTab === 'utilities'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
-            <Settings className="w-4.5 h-4.5 shrink-0 opacity-90" />
-            <span>أدوات النظام والمزامنة</span>
+            <Settings className="w-4 h-4 shrink-0 opacity-90" />
+            <span>الأدوات</span>
           </button>
         </div>
 
         {/* Offline status info widget from CSS design mockup */}
-        <div className="p-4 m-4 bg-slate-850/40 rounded-xl border border-slate-800 mt-auto shrink-0">
-          <p className="text-[10px] text-slate-400 mb-1">وضعية المزامنة</p>
-          <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5 leading-none">
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        <div className="p-3 m-3 bg-slate-850/40 rounded-xl border border-slate-800 mt-auto shrink-0 transition-colors">
+          <p className="text-[9px] text-slate-400 mb-1">حالة الاتصال</p>
+          <div className={`text-[10px] font-black flex items-center gap-1.5 leading-none ${
+            !isOnline ? 'text-amber-400' : (isSyncing ? 'text-indigo-400' : 'text-emerald-400')
+          }`}>
+            <span className="relative flex h-1.5 w-1.5 shrink-0">
+              {isOnline && !isSyncing && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+              <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+                !isOnline ? 'bg-amber-500 animate-pulse' : (isSyncing ? 'bg-indigo-500 animate-spin' : 'bg-emerald-500')
+              }`}></span>
             </span>
-            <span>آمنة وسحابية (مزامنة فورية)</span>
+            <span>
+              {!isOnline ? 'وضع أوفلاين' : (isSyncing ? 'جاري المزامنة...' : 'مزامن لحظياً')}
+            </span>
           </div>
+          {!isOnline && pendingSyncCount > 0 && (
+             <div className="mt-1.5 text-[8px] font-black text-white/40 bg-white/5 py-1 px-2 rounded-lg border border-white/5">
+                ⌛ {pendingSyncCount} معاملة معلقة
+             </div>
+          )}
         </div>
       </aside>
 
@@ -547,49 +568,78 @@ function AppContent() {
       <div className="flex-1 flex flex-col min-h-screen min-w-0">
         
         {/* State/Connection Alert Header */}
-        {isOfflineSimulated && (
-          <div className="bg-red-500 text-white text-xs font-bold py-2.5 px-4 shadow-sm text-center flex items-center justify-center gap-1.5 transition-colors relative z-30">
-            <WifiOff className="w-4 h-4 animate-pulse shrink-0" />
-            <span>تنبيه: أنت تعمل في وضعية عدم الاتصال المحاكاة - سيتم الاحتفاظ بالعمليات في المزامنة المعلقة فور إعادة تشغيل الاتصال.</span>
+        {!isOnline && (
+          <div className="bg-amber-500 text-white text-[10px] font-black py-2 px-4 shadow-md text-center flex items-center justify-center gap-2 transition-all relative z-30 animate-in fade-in slide-in-from-top-1">
+            <WifiOff className="w-3.5 h-3.5" />
+            <span>أنت في وضع عدم الاتصال حالياً</span>
+            {pendingSyncCount > 0 && (
+              <span className="bg-white/20 px-2 py-0.5 rounded-lg border border-white/10">
+                ⏳ {pendingSyncCount} معاملة بانتظار المزامنة
+              </span>
+            )}
+          </div>
+        )}
+
+        {isOfflineSimulated && isOnline && (
+          <div className="bg-slate-700 text-white text-[10px] font-black py-2 px-4 shadow-md text-center flex items-center justify-center gap-2 transition-all relative z-30">
+            <WifiOff className="w-3.5 h-3.5 animate-pulse" />
+            <span>تنبيه: محاكاة وضع أوفلاين نشطة للتدقيق الفني</span>
           </div>
         )}
 
         {/* C. HEADER */}
 
         {/* C1. Desktop Main Header (Hidden on Mobile) */}
-        <header className="h-18 bg-white border-b border-slate-200 hidden md:flex items-center justify-between px-8 shrink-0 relative z-10 transition-colors">
+        <header className="h-14 bg-white border-b border-slate-200 hidden md:flex items-center justify-between px-6 shrink-0 relative z-10 transition-colors">
           <div className="flex items-center gap-3">
-            <h2 className="text-md font-extrabold text-slate-900 tracking-tight">
-              {activeTab === 'dashboard' && 'نظرة عامة على البيانات والتحليلات'}
-              {activeTab === 'customers' && 'كشف حسابات العملاء والدفعات'}
-              {activeTab === 'reminders' && 'مساعد التذكيرات الذكي وصياغة Gemini AI'}
-              {activeTab === 'utilities' && 'نسخ احتياطي واسترجاع وإعدادات الدفتر'}
+            <h2 className="text-sm font-black text-slate-800 tracking-tight">
+              {activeTab === 'dashboard' && 'البيانات والتحليلات'}
+              {activeTab === 'customers' && 'كشف حسابات العملاء'}
+              {activeTab === 'reminders' && 'مساعد التذكيرات الذكي'}
+              {activeTab === 'utilities' && 'أدوات الدفتر'}
+              {activeTab === 'team' && 'فريق العمل'}
             </h2>
-            <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-1 rounded">المزامنة: سحابي فوري ⚡</span>
+            <div className="flex items-center gap-2">
+              <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black transition-all ${
+                isOnline 
+                  ? (isSyncing ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600')
+                  : 'bg-amber-50 text-amber-600'
+              }`}>
+                <span className={`w-1 h-1 rounded-full ${
+                  !isOnline ? 'bg-amber-500 animate-pulse' : (isSyncing ? 'bg-indigo-500 animate-spin' : 'bg-emerald-500 animate-pulse')
+                }`} />
+                {!isOnline ? 'وضع أوفلاين' : (isSyncing ? 'جاري التحديث...' : 'مزامن لحظياً')}
+              </span>
+              
+              {activeMembersCount > 1 && isOnline && (
+                <span className="flex items-center gap-1 bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full text-[9px] font-black">
+                  <UserCheck className="w-2.5 h-2.5" />
+                  {activeMembersCount} نشطون
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-4 bg-slate-50 py-1.5 px-3 rounded-xl border border-slate-150 text-[11px] font-bold">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 bg-slate-50 py-1.5 px-3 rounded-xl border border-slate-150 text-[10px] font-black">
               <div className="space-y-0.5 text-right">
-                <span className="text-[9px] text-slate-400 font-medium block">إجمالي الديون المعلقة:</span>
-                <span className="text-xs font-black text-rose-600">{formatCurrency(summary.grandTotalRemaining)}</span>
+                <span className="text-[8px] text-slate-450 block">الديون:</span>
+                <span className="text-rose-600">{formatCurrency(summary.grandTotalRemaining)}</span>
               </div>
-              <div className="h-5 w-px bg-slate-200" />
+              <div className="h-4 w-px bg-slate-200" />
               <div className="space-y-0.5 text-right">
-                <span className="text-[9px] text-slate-400 font-medium block">إجمالي المحصل بالخزينة:</span>
-                <span className="text-xs font-black text-emerald-600">✓ {formatCurrency(summary.grandTotalPaid)}</span>
+                <span className="text-[8px] text-slate-450 block">المحصل:</span>
+                <span className="text-emerald-600">{formatCurrency(summary.grandTotalPaid)}</span>
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={triggerAddCustomer}
-                className="bg-sky-900 hover:bg-sky-950 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-xs shrink-0 cursor-pointer border-b-2 border-amber-400 flex items-center gap-2"
-              >
-                <UserPlus className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>إضافة عميل جديد</span>
-              </button>
-            </div>
+            <button
+              onClick={triggerAddCustomer}
+              className="bg-sky-900 hover:bg-sky-950 text-white font-black px-3 py-1.5 rounded-xl text-[10px] transition-all shadow-xs shrink-0 cursor-pointer border-b border-amber-500 flex items-center gap-1.5"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>عميل جديد</span>
+            </button>
           </div>
         </header>
 
@@ -601,7 +651,24 @@ function AppContent() {
                 {renderVisualIdentity('sm')}
                 <div>
                   <h1 className="text-xs font-black text-slate-800 leading-none truncate max-w-[140px]">{businessName}</h1>
-                  <p className="text-[9px] text-amber-600 font-bold mt-1">{translateRole(profile?.role)}: {profile?.delegateName || user.email}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-[9px] text-amber-600 font-bold">{translateRole(profile?.role)}</p>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                    <span className={`flex items-center gap-1 text-[8px] font-bold ${
+                      !isOnline ? 'text-amber-600' : (isSyncing ? 'text-indigo-600' : 'text-emerald-600')
+                    }`}>
+                      <span className={`w-1 h-1 rounded-full ${
+                        !isOnline ? 'bg-amber-500' : (isSyncing ? 'bg-indigo-500 animate-spin' : 'bg-emerald-500 animate-pulse')
+                      }`} />
+                      {!isOnline ? 'وضع أوفلاين' : (isSyncing ? 'جاري المزامنة' : 'متصل')}
+                    </span>
+                    {!isOnline && pendingSyncCount > 0 && (
+                      <>
+                        <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                        <span className="text-[8px] font-black text-indigo-600">⏳ {pendingSyncCount} معلقة</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               
@@ -694,7 +761,7 @@ function AppContent() {
         </header>
 
         {/* D. BODY AND SCENE CONTENT CONTAINER */}
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto max-w-7xl w-full mx-auto md:max-w-none">
+        <main className="flex-1 p-3 md:p-5 overflow-y-auto max-w-7xl w-full mx-auto md:max-w-none">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

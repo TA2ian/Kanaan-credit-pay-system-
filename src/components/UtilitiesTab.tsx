@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Download, Upload, Database, Wifi, WifiOff, Image as ImageIcon, Trash2, ChevronDown, ChevronUp, BookOpen, Sparkles, Key, ShieldAlert, Check, X, Building2, AlertTriangle, RefreshCw, Share2, Mail, Phone } from 'lucide-react';
-import { getCustomers, getDebts, getPayments, saveCustomers, saveDebts, savePayments } from '../lib/db';
+import { Download, Upload, Database, Wifi, WifiOff, Image as ImageIcon, Trash2, ChevronDown, ChevronUp, BookOpen, Sparkles, Key, ShieldAlert, Check, X, Building2, AlertTriangle, RefreshCw, Mail, Phone, FileText } from 'lucide-react';
 import { usePopup } from '../lib/PopupContext';
 import { useFirebase } from '../lib/FirebaseContext';
+import { CustomerClassification } from '../lib/db';
 import { GuideTab } from './GuideTab';
 
 interface UtilitiesProps {
@@ -14,7 +14,7 @@ interface UtilitiesProps {
 }
 
 export function UtilitiesTab({ isOfflineSimulated, onToggleOfflineSimulated, onRefresh }: UtilitiesProps) {
-  const { profile, updateBusinessProfile, wipeAllInFS } = useFirebase();
+  const { profile, updateBusinessProfile, wipeAllInFS, customers, transactions, importBackupToFS } = useFirebase();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -212,9 +212,8 @@ export function UtilitiesTab({ isOfflineSimulated, onToggleOfflineSimulated, onR
       const backup = {
         version: 'kanaan_v1',
         timestamp: new Date().toISOString(),
-        customers: getCustomers(),
-        debts: getDebts(),
-        payments: getPayments(),
+        customers: customers || [],
+        transactions: transactions || []
       };
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -223,10 +222,88 @@ export function UtilitiesTab({ isOfflineSimulated, onToggleOfflineSimulated, onR
       link.download = `kanaan_backup_${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       URL.revokeObjectURL(url);
-    } catch {
+    } catch (err: any) {
       showAlert({
         title: 'فشل تصدير البيانات',
-        message: 'عذراً، فشل في تصدير البيانات وتوليد نسخة احتياطية محلية.',
+        message: 'عذراً، فشل في تصدير البيانات وتوليد نسخة احتياطية: ' + err.message,
+        type: 'error'
+      });
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!customers || customers.length === 0) {
+      showAlert({
+        title: 'لا توجد بيانات',
+        message: 'عذراً، لا يوجد بيانات لتصديرها حالياً.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    try {
+      // Helper for CSV generation
+      const generateCSV = (headers: string[], rows: any[][]) => {
+        const csvContent = [
+          headers.join(','),
+          ...rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+        
+        // Add UTF-8 BOM for Arabic in Excel
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        return blob;
+      };
+
+      // 1. Export Customers
+      const customerHeaders = ['الاسم', 'رقم الهاتف', 'العنوان', 'إجمالي الدين', 'آخر معاملة'];
+      const customerRows = (customers || []).map(c => [
+        c.name,
+        c.phone || '',
+        c.address || '',
+        c.totalDebt?.toLocaleString() || '0',
+        c.lastTransactionDate ? new Date(c.lastTransactionDate).toLocaleDateString('ar-SA') : 'لا يوجد'
+      ]);
+      const customerBlob = generateCSV(customerHeaders, customerRows);
+      
+      // 2. Export Transactions
+      const transHeaders = ['التاريخ', 'اسم الزبون', 'اسم المندوب', 'النوع', 'المبلغ', 'الملاحظات'];
+      const transRows = (transactions || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(t => {
+        const customer = (customers || []).find(c => c.id === t.customerId);
+        return [
+          new Date(t.date).toLocaleDateString('ar-SA'),
+          customer?.name || 'زبون محذوف',
+          t.delegateName || 'غير معروف',
+          t.type === 'debt' ? 'دين (+)' : 'تحصيل (-)',
+          t.amount.toLocaleString(),
+          t.note || ''
+        ];
+      });
+      const transBlob = generateCSV(transHeaders, transRows);
+
+      // Trigger Downloads
+      const downloadFile = (blob: Blob, name: string) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = name;
+        link.click();
+        URL.revokeObjectURL(url);
+      };
+
+      downloadFile(customerBlob, `kanaan_customers_${new Date().toISOString().slice(0, 10)}.csv`);
+      setTimeout(() => {
+        downloadFile(transBlob, `kanaan_transactions_${new Date().toISOString().slice(0, 10)}.csv`);
+      }, 500);
+
+      showAlert({
+        title: 'تم تصدير البيانات بنجاح',
+        message: 'تم توليد ملفات CSV للزبائن والمعاملات وتحميلها بنجاح.',
+        type: 'success'
+      });
+    } catch (err: any) {
+      showAlert({
+        title: 'فشل تصدير CSV',
+        message: 'حصل خطأ أثناء محاولة توليد ملفات CSV: ' + err.message,
         type: 'error'
       });
     }
@@ -237,26 +314,34 @@ export function UtilitiesTab({ isOfflineSimulated, onToggleOfflineSimulated, onR
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed.version === 'kanaan_v1' && Array.isArray(parsed.customers)) {
           showConfirm({
             title: 'تأكيد استيراد النسخة الاحتياطية',
-            message: 'تنبيه! استيراد هذه النسخة سيقوم بمسح واستبدال كافة الحسابات الحالية على الهاتف. هل تريد المتابعة؟',
+            message: 'تنبيه! استيراد هذه النسخة سيقوم بدمج الحسابات مع البيانات الحالية سحابياً. هل تريد المتابعة؟',
             isDanger: true,
-            confirmText: 'نعم، استيراد واستبدال',
+            confirmText: 'نعم، استيراد الآن',
             cancelText: 'إلغاء',
-            onConfirm: () => {
-              saveCustomers(parsed.customers);
-              saveDebts(parsed.debts || []);
-              savePayments(parsed.payments || []);
-              onRefresh();
-              showAlert({
-                title: 'تم استيراد البيانات',
-                message: 'تم استيراد نسخة كنعان المعتمدة المحددة بالكامل وبنجاح لتحديث كافة البيانات.',
-                type: 'success'
-              });
+            onConfirm: async () => {
+              try {
+                // Compatible with old and new structures
+                const backupTransactions = parsed.transactions || [...(parsed.debts || []), ...(parsed.payments || [])];
+                await importBackupToFS(parsed.customers, backupTransactions);
+                onRefresh();
+                showAlert({
+                  title: 'تم استيراد البيانات',
+                  message: 'تم استيراد نسخة كنعان وتحديث قاعدة البيانات السحابية بنجاح.',
+                  type: 'success'
+                });
+              } catch (err: any) {
+                showAlert({
+                  title: 'فشل الاستيراد السحابي',
+                  message: 'حصل خطأ أثناء محاولة رفع النسخة إلى السحاب: ' + err.message,
+                  type: 'error'
+                });
+              }
             }
           });
         } else {
@@ -506,28 +591,39 @@ export function UtilitiesTab({ isOfflineSimulated, onToggleOfflineSimulated, onR
           <PanelHeader id="data" label="إدارة البيانات والنسخ الاحتياطي" icon={Database} colorClass="indigo" />
           {expandedPanels['data'] && (
             <div className="p-1 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button onClick={handleExport} className="flex items-center gap-3 p-4 bg-slate-50/80 hover:bg-indigo-50/50 border border-slate-100 rounded-xl transition-all text-right group shadow-xs cursor-pointer">
-                  <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-all">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <button onClick={handleExport} className="flex items-center gap-3 p-4 bg-slate-50/80 hover:bg-indigo-50/50 border border-slate-100 rounded-xl transition-all text-right group shadow-xs cursor-pointer h-full">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-all shrink-0">
                     <Download className="w-5 h-5" />
                   </div>
-                  <div>
-                    <div className="font-bold text-slate-800 transition-colors">تصدير قاعدة البيانات (Backup)</div>
-                    <p className="text-[10px] text-slate-500 transition-colors">حفظ نسخة كاملة من سجلات الحسابات والديون.</p>
+                  <div className="flex-1">
+                    <div className="font-bold text-slate-800 transition-colors text-sm">تصدير قاعدة البيانات (JSON)</div>
+                    <p className="text-[10px] text-slate-500 transition-colors">نسخة احتياطية كاملة مخصصة للاسترجاع.</p>
                   </div>
                 </button>
 
-                <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 p-4 bg-slate-50/80 hover:bg-emerald-50/50 border border-slate-100 rounded-xl transition-all text-right group shadow-xs cursor-pointer">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-all">
+                <button onClick={handleExportCSV} className="flex items-center gap-3 p-4 bg-white hover:bg-sky-50/50 border border-sky-100 rounded-xl transition-all text-right group shadow-xs cursor-pointer h-full">
+                  <div className="w-10 h-10 rounded-lg bg-sky-100 flex items-center justify-center text-sky-600 group-hover:scale-110 transition-all shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-bold text-slate-800 transition-colors text-sm">تصدير إلى CSV (Excel)</div>
+                    <p className="text-[10px] text-slate-500 transition-colors">تصدير الحسابات والمعاملات لفتحها بـ Excel.</p>
+                  </div>
+                </button>
+
+                <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 p-4 bg-slate-50/80 hover:bg-emerald-50/50 border border-slate-100 rounded-xl transition-all text-right group shadow-xs cursor-pointer h-full sm:col-span-2 lg:col-span-1">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-all shrink-0">
                     <Upload className="w-5 h-5" />
                   </div>
-                  <div>
-                    <div className="font-bold text-slate-800 transition-colors">استيراد نسخة احتياطية (Restore)</div>
-                    <p className="text-[10px] text-slate-500 transition-colors">استبدال السجلات الحالية بنسخة محفوظة سابقاً.</p>
+                  <div className="flex-1">
+                    <div className="font-bold text-slate-800 transition-colors text-sm">استرجاع نسخة احتياطية</div>
+                    <p className="text-[10px] text-slate-500 transition-colors">رفع ملف JSON سابق لتعويض الحالة الحالية.</p>
                   </div>
-                  <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
                 </button>
               </div>
+
+              <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
 
               {/* Danger Zone: Full Database Wipe */}
               <div className="bg-rose-50/30 border border-rose-100/40 p-5 rounded-xl space-y-4 transition-colors">
