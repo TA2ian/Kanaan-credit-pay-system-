@@ -1,24 +1,19 @@
 #!/bin/bash
 
-# Dependency Install Script for Canaan Smart Group Project
-# This script ensures Node.js is present and installs all project dependencies.
+# Canaan Smart Group - Dependency Installation
+# ---------------------------------------------
+# This script installs all necessary dependencies for the project.
 
-echo "--- Starting Dependency Installation ---"
+echo "📦 Installing project dependencies..."
 
-# Check if npm is installed
-if ! command -v npm &> /dev/null
-then
-    echo "Error: npm is not installed. Please install Node.js first."
-    exit 1
-fi
-
-echo "Installing existing dependencies from package.json..."
+# We use root-level installation as the project is currently in the root directory.
+# If you move this to a monorepo, update the directory path below.
 npm install
 
 if [ $? -eq 0 ]; then
-    echo "--- Installation Successful! ---"
-    echo "You can now run 'npm run dev' to start the development server."
+  echo "✅ Dependencies installed successfully."
+  echo "🚀 Run 'npm run dev' to start the development server."
 else
-    echo "--- Installation Failed! ---"
-    exit 1
+  echo "❌ Installation failed. Please check your network connection and try again."
+  exit 1
 fi
