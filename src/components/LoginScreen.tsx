@@ -63,6 +63,8 @@ export function LoginScreen() {
         setError('كلمة المرور ضعيفة جداً. يجب أن تكون ٦ خانات على الأقل.');
       } else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
         setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+      } else if (err.code === 'auth/user-disabled') {
+        setError('عذراً، تم تعطيل هذا الحساب. يرجى التواصل مع الإدارة لاسترجاع الوصول.');
       } else if (err.message && err.message.includes('auth/configuration-not-found')) {
         setError('تنبيه: ميزة تسجيل الدخول بالبريد الإلكتروني مغلقة بقنصل مشروع فايربيس حالياً. يرجى تفعيلها من لوحة تحكم Firebase Console أو استخدام تسجيل دخول Google المتاح فورياً.');
       } else {
@@ -81,7 +83,11 @@ export function LoginScreen() {
       setSuccess('مرحباً بك! تم التفويض الآمن عبر حساب Google.');
     } catch (err: any) {
       console.error(err);
-      setError('فشلت عملية المصادقة عبر Google. يرجى التأكد من اتصال الخادم وإعادة المحاولة.');
+      if (err.code === 'auth/user-disabled') {
+        setError('عذراً، تم تعطيل هذا الحساب. يرجى التواصل مع الإدارة لاسترجاع الوصول.');
+      } else {
+        setError('فشلت عملية المصادقة عبر Google. يرجى التأكد من اتصال الخادم وإعادة المحاولة.');
+      }
     } finally {
       setLoading(false);
     }
