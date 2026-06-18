@@ -19,7 +19,9 @@ import {
   Users, 
   Lock,
   UserCheck,
-  RefreshCw
+  RefreshCw,
+  Link,
+  Copy
 } from 'lucide-react';
 
 export function TeamTab() {
@@ -28,6 +30,7 @@ export function TeamTab() {
     teamMembers, 
     pendingInvitations, 
     inviteTeamMember, 
+    generateLinkInvitation,
     deleteTeamMemberProfile, 
     cancelInvitation 
   } = useFirebase();
@@ -40,6 +43,43 @@ export function TeamTab() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // Link generation states
+  const [linkOptionRole, setLinkOptionRole] = useState<'manager' | 'assistant' | 'accountant' | 'representative'>('representative');
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleGenerateLink = async () => {
+    setLinkLoading(true);
+    setGeneratedCode(null);
+    try {
+      const code = await generateLinkInvitation(linkOptionRole);
+      setGeneratedCode(code);
+      showAlert({
+        title: 'تم توليد الرابط بنجاح',
+        message: 'تم توليد رابط دعوة مخصص بنجاح، يمكنك الآن نسخه ومشاركته.',
+        type: 'success'
+      });
+    } catch (err: any) {
+      console.error(err);
+      showAlert({
+        title: 'حدث خطأ',
+        message: 'فشل توليد رابط الدعوة: ' + (err.message || err),
+        type: 'error'
+      });
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (!generatedCode) return;
+    const url = `${window.location.origin}?inviteCode=${generatedCode}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,6 +270,74 @@ export function TeamTab() {
             </button>
           </form>
 
+          {/* Divider */}
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-slate-150"></div>
+            <span className="flex-shrink mx-3 text-[9px] text-slate-400 font-bold uppercase transition-colors">أو توليد رابط دعوة فوري</span>
+            <div className="flex-grow border-t border-slate-150"></div>
+          </div>
+
+          {/* Link invitation section */}
+          <div className="space-y-3.5 pt-1">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 block transition-colors">تحديد الصلاحية المضمنة بالرابط السريع</label>
+              <select
+                value={linkOptionRole}
+                onChange={(e) => {
+                  setLinkOptionRole(e.target.value as any);
+                  setGeneratedCode(null);
+                }}
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-all"
+              >
+                <option value="assistant">مساعد المدير (كامل الصلاحيات عدا التصفية)</option>
+                <option value="accountant">محاسب مالي (معالجة ديون ودفعات)</option>
+                <option value="representative">مندوب ميداني (تعبئة وتحصيل فقط)</option>
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGenerateLink}
+              disabled={linkLoading}
+              className="w-full border-2 border-dashed border-indigo-400 hover:border-indigo-600 bg-indigo-50/10 hover:bg-indigo-50 text-indigo-700 font-black py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 opacity-100"
+            >
+              <Link className="w-4 h-4 text-indigo-600 animate-pulse" />
+              <span>{linkLoading ? 'جاري توليد الرابط...' : 'توليد رابط دعوة فريد 🔗'}</span>
+            </button>
+
+            {generatedCode && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="p-3 bg-indigo-50/40 border border-indigo-150 rounded-xl space-y-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[9px] font-bold text-indigo-700">رابط الدعوة المباشر جاهز:</span>
+                  <span className="text-[8px] bg-indigo-200 text-indigo-800 font-extrabold px-1.5 py-0.5 rounded-md">جديد ✨</span>
+                </div>
+                <div className="flex gap-1.5 font-mono">
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${window.location.origin}?inviteCode=${generatedCode}`}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-mono text-slate-700 select-all focus:outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition-colors shrink-0"
+                    title="نسخ الرابط"
+                  >
+                    {copied ? <Check className="w-4 h-4 text-emerald-450" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+                {copied && (
+                  <p className="text-[9px] text-emerald-600 font-extrabold text-center animate-bounce">تم نسخ الرابط! أرسله للموظف لينضم فوراً.</p>
+                )}
+              </motion.div>
+            )}
+          </div>
+
           {/* Permissions explanation box */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-2.5 text-[10px] text-slate-500 font-semibold leading-relaxed transition-colors">
             <div className="flex gap-2">
@@ -337,17 +445,42 @@ export function TeamTab() {
               <div className="space-y-2.5">
                 {pendingInvitations.map((inv) => {
                   const roleInfo = translateRole(inv.role);
+                  const isLinkInvite = !inv.email;
+                  
+                  const handleCopyExistingLink = (code: string) => {
+                    const url = `${window.location.origin}?inviteCode=${code}`;
+                    navigator.clipboard.writeText(url);
+                    showAlert({
+                      title: 'تم نسخ الرابط',
+                      message: 'تم نسخ رابط الدعوة الخاص بالمنضم الجديد مرة أخرى.',
+                      type: 'success'
+                    });
+                  };
+
                   return (
                     <div 
                       key={inv.id}
                       className="flex items-center justify-between p-3 bg-amber-50/40 border border-amber-100 rounded-xl gap-4 transition-colors"
                     >
                       <div className="truncate shrink-1">
-                        <span className="text-xs font-bold text-slate-800 text-left block font-mono truncate transition-colors">{inv.email}</span>
-                        <span className="text-[9px] text-slate-400 block mt-0.5 transition-colors">مرسلة بواسطة: {inv.invitedBy}</span>
+                        <span className="text-xs font-bold text-slate-800 text-left block font-mono truncate transition-colors">
+                          {isLinkInvite ? 'رابط دعوة مفتوح مباشر 🔗' : inv.email}
+                        </span>
+                        <span className="text-[9px] text-slate-400 block mt-0.5 transition-colors">جهة الدعوة: {inv.invitedBy}</span>
                       </div>
                       
-                      <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isLinkInvite && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyExistingLink(inv.id)}
+                            className="p-1 px-2.5 bg-indigo-50/85 hover:bg-indigo-100 text-[10px] text-indigo-700 border border-indigo-200 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-colors shrink-0 flex items-center gap-1 font-sans"
+                            title="نسخ الرابط مجدداً"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>نسخ</span>
+                          </button>
+                        )}
                         <span className={`text-[8.5px] font-black px-2 py-0.5 border rounded-md transition-colors ${roleInfo.color}`}>
                           {roleInfo.name}
                         </span>

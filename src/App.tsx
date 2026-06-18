@@ -322,11 +322,11 @@ function AppContent() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans text-right" dir="rtl">
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
           style={{ willChange: 'transform, opacity' }}
-          className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl text-center space-y-6 max-w-sm w-full relative overflow-hidden"
+          className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl text-center space-y-6 max-w-sm w-full relative overflow-hidden gpu-accelerated"
         >
           {/* Animated pulsing gradient background accent */}
           <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 animate-pulse" />
@@ -334,13 +334,13 @@ function AppContent() {
           <div className="relative flex items-center justify-center mx-auto w-20 h-20">
             {/* Outer rings with glowing and rotating animation */}
             <motion.div 
-              className="absolute inset-0 rounded-full border-4 border-indigo-100 border-t-indigo-600"
+              className="absolute inset-0 rounded-full border-4 border-indigo-100 border-t-indigo-600 gpu-accelerated-rotate"
               animate={{ rotate: 360 }}
               style={{ willChange: 'transform' }}
               transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
             />
             <motion.div 
-              className="absolute inset-2 rounded-full border border-dashed border-emerald-500/60"
+              className="absolute inset-2 rounded-full border border-dashed border-emerald-500/60 gpu-accelerated-rotate"
               animate={{ rotate: -360 }}
               style={{ willChange: 'transform' }}
               transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
@@ -765,11 +765,12 @@ function AppContent() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.22, ease: "easeOut" }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
               style={{ willChange: "transform, opacity" }}
+              className="gpu-accelerated"
             >
               {activeTab === 'dashboard' && (
                 <DashboardTab 

@@ -6,7 +6,7 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DatabaseState, getCustomerBalances, CustomerBalance } from '../lib/db';
-import { formatCurrency, formatPhoneNumberForUrl, getGeminiHeaders } from '../lib/utils';
+import { formatCurrency, formatPhoneNumberForUrl, getGeminiHeaders, triggerHaptic } from '../lib/utils';
 import { useFirebase } from '../lib/FirebaseContext';
 import { 
   Send, 
@@ -187,6 +187,7 @@ export function RemindersTab({ db }: RemindersTabProps) {
 
   const handleCopyToClipboard = () => {
     if (!generatedMessage) return;
+    triggerHaptic('success');
     navigator.clipboard.writeText(generatedMessage);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -194,6 +195,7 @@ export function RemindersTab({ db }: RemindersTabProps) {
 
   const handleSendWhatsApp = () => {
     if (!selectedDebtorBalance || !generatedMessage) return;
+    triggerHaptic('medium');
     
     // Clean and format phone number via shared utility
     const cleanPhone = formatPhoneNumberForUrl(selectedDebtorBalance.customer.phone);

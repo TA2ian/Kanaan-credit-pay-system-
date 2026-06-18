@@ -122,6 +122,7 @@ interface FirebaseContextType {
   ) => Promise<void>;
   updateBusinessProfile: (updates: Partial<UserProfile>) => Promise<void>;
   inviteTeamMember: (email: string, role: 'manager' | 'assistant' | 'accountant' | 'representative') => Promise<void>;
+  generateLinkInvitation: (role: 'manager' | 'assistant' | 'accountant' | 'representative') => Promise<string>;
   deleteTeamMemberProfile: (memberId: string) => Promise<void>;
   cancelInvitation: (invitationId: string) => Promise<void>;
   addCustomerToFS: (name: string, phone: string, email?: string, notes?: string, region?: string) => Promise<void>;
@@ -169,6 +170,22 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
+  }, []);
+
+  // 0. Extract URL Invite Code
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const inviteCode = params.get('inviteCode');
+      if (inviteCode) {
+        localStorage.setItem('pending_invite_code', inviteCode);
+        // Clean URL cleanly
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    } catch (e) {
+      console.error('Failed to parse and store inviteCode:', e);
+    }
   }, []);
 
   // 1. Observe Auth Changes
@@ -234,45 +251,75 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
         setProfileLoading(false);
       } else {
-        // Check if there is an active invitation for this user's email
+        // Check if there is an active invitation
         const userEmail = user.email?.toLowerCase().trim();
-        if (userEmail) {
+        let inviteData: any = null;
+        let inviteDocId: string | null = null;
+
+        // Try code invitation first
+        const storedInviteCode = localStorage.getItem('pending_invite_code');
+        if (storedInviteCode) {
+          try {
+            const inviteDocSnap = await getDoc(doc(db, 'invitations', storedInviteCode));
+            if (inviteDocSnap.exists()) {
+              inviteData = inviteDocSnap.data();
+              inviteDocId = inviteDocSnap.id;
+            }
+          } catch (e) {
+            console.error('Error scanning code invitation on signup:', e);
+          }
+        }
+
+        // If no code, try email invitation
+        if (!inviteData && userEmail) {
           try {
             const inviteQuery = query(collection(db, 'invitations'), where('email', '==', userEmail));
             const inviteSnap = await getDocs(inviteQuery);
             if (!inviteSnap.empty) {
               const inviteDoc = inviteSnap.docs[0];
-              const inviteData = inviteDoc.data();
-              
-              // Automatically accept invitation and create UserProfile
-              const newProfile: UserProfile = {
-                userId: user.uid,
-                email: userEmail,
-                businessName: inviteData.businessName || 'مجموعة كنعان الذكية',
-                businessType: 'company',
-                role: inviteData.role || 'representative',
-                companyId: inviteData.companyId,
-                phone: '',
-                delegateName: user.displayName || userEmail.split('@')[0],
-                createdAt: new Date().toISOString(),
-                businessEmoji: inviteData.businessEmoji || '🌾',
-                businessDesc: inviteData.businessDesc || '',
-                copyrightText: inviteData.copyrightText || ''
-              };
-              
-              const batch = writeBatch(db);
-              batch.set(doc(db, 'profiles', user.uid), newProfile);
-              batch.delete(doc(db, 'invitations', inviteDoc.id));
-              await batch.commit();
-              
-              setProfile(newProfile);
-              setProfileLoading(false);
-              return;
+              inviteData = inviteDoc.data();
+              inviteDocId = inviteDoc.id;
             }
           } catch (e) {
             console.error('Error scanning user invitations on signup:', e);
           }
         }
+
+        // If we found an invitation (either code/link or email)
+        if (inviteData && inviteDocId) {
+          try {
+            const newProfile: UserProfile = {
+              userId: user.uid,
+              email: userEmail || user.email || '',
+              businessName: inviteData.businessName || 'مجموعة كنعان الذكية',
+              businessType: 'company',
+              role: inviteData.role || 'representative',
+              companyId: inviteData.companyId,
+              phone: '',
+              delegateName: user.displayName || userEmail?.split('@')[0] || 'موظف جديد',
+              createdAt: new Date().toISOString(),
+              businessEmoji: inviteData.businessEmoji || '🌾',
+              businessDesc: inviteData.businessDesc || '',
+              copyrightText: inviteData.copyrightText || ''
+            };
+            
+            const batch = writeBatch(db);
+            batch.set(doc(db, 'profiles', user.uid), newProfile);
+            batch.delete(doc(db, 'invitations', inviteDocId));
+            await batch.commit();
+            
+            if (storedInviteCode) {
+              localStorage.removeItem('pending_invite_code');
+            }
+            
+            setProfile(newProfile);
+            setProfileLoading(false);
+            return;
+          } catch (e) {
+            console.error('Error auto-accepting invitation:', e);
+          }
+        }
+
         setProfile(null);
         setProfileLoading(false);
       }
@@ -520,6 +567,27 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const generateLinkInvitation = async (role: 'manager' | 'assistant' | 'accountant' | 'representative'): Promise<string> => {
+    if (!user || !profile) throw new Error('يجب تسجيل الدخول أولاً كمدير لتوليد رابط دعوة.');
+    const code = `invite-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    const path = 'invitations';
+    try {
+      await setDoc(doc(db, path, code), {
+        email: '', // Empty email signifies it's an open invite link
+        code,
+        companyId: profile.companyId,
+        businessName: profile.businessName,
+        role,
+        invitedBy: user.email || '',
+        createdAt: new Date().toISOString()
+      });
+      return code;
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, `${path}/${code}`);
+      throw e;
+    }
+  };
+
   const deleteTeamMemberProfile = async (memberId: string) => {
     if (!user || !profile) return;
     // Prevent self-deletion of primary manager
@@ -742,6 +810,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       createBusinessProfile,
       updateBusinessProfile,
       inviteTeamMember,
+      generateLinkInvitation,
       deleteTeamMemberProfile,
       cancelInvitation,
       addCustomerToFS,

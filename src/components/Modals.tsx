@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { Customer, TransactionType, CustomerClassification, Transaction } from '../lib/db';
 import { X, UserPlus, FileSpreadsheet, PlusCircle, Calendar, ShieldCheck, DollarSign, Contact, Archive } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, triggerHaptic } from '../lib/utils';
 
 interface ModalProps {
   isOpen: boolean;
@@ -86,13 +86,16 @@ export function CustomerModal({ isOpen, onClose, customer, onSave }: CustomerMod
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
+      triggerHaptic('warning');
       setError('يرجى ملء اسم العميل الكريم.');
       return;
     }
     if (!phone.trim()) {
+      triggerHaptic('warning');
       setError('يرجى ملء رقم الهاتف الواتساب.');
       return;
     }
+    triggerHaptic('success');
     onSave(name.trim(), phone.trim(), email.trim(), notes.trim(), region.trim(), classification);
     onClose();
   };
@@ -293,14 +296,17 @@ export function TransactionModal({ isOpen, onClose, customers, customerId, custo
     e.preventDefault();
     const idToUse = selectedCustomerId || customerId;
     if (!idToUse) {
+      triggerHaptic('warning');
       setError('يرجى تحديد العميل المستهدف أولاً لتسجيل المعاملة المالية.');
       return;
     }
     const val = parseFloat(amount);
     if (isNaN(val) || val <= 0) {
+      triggerHaptic('warning');
       setError('يرجى إدخال مبلغ مالي صحيح أكبر من الصفر.');
       return;
     }
+    triggerHaptic('success');
     onSave(
       idToUse,
       type,

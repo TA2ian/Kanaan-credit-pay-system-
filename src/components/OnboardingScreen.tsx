@@ -50,11 +50,11 @@ export function OnboardingScreen() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 md:p-8 transition-colors duration-300" dir="rtl">
       <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.97 }}
+        initial={{ opacity: 0, y: 15, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", duration: 0.6 }}
+        transition={{ type: "spring", stiffness: 360, damping: 26 }}
         style={{ willChange: "transform, opacity" }}
-        className="w-full max-w-xl bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden transition-colors"
+        className="w-full max-w-xl bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden transition-colors gpu-accelerated"
       >
         {/* Top Header Banner decoration */}
         <div className="p-8 text-center bg-radial-at-t from-sky-950 to-slate-900 border-b border-amber-500/20 text-white relative">

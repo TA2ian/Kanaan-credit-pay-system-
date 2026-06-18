@@ -17,7 +17,7 @@ import {
   saveDatabase
 } from '../lib/db';
 import { useFirebase } from '../lib/FirebaseContext';
-import { formatCurrency, formatDate, formatPhoneNumberForUrl } from '../lib/utils';
+import { formatCurrency, formatDate, formatPhoneNumberForUrl, triggerHaptic } from '../lib/utils';
 import { 
   Search, 
   UserPlus, 
@@ -41,7 +41,11 @@ import {
   ArrowUpDown,
   Send,
   Check,
-  RotateCcw
+  RotateCcw,
+  Settings,
+  Edit,
+  MoreHorizontal,
+  MoreVertical
 } from 'lucide-react';
 import { QuickActionFAB } from './QuickActionFAB';
 import { StatementPreviewModal } from './StatementPreviewModal';
@@ -74,6 +78,11 @@ export function CustomersTab({
   const [filterType, setFilterType] = useState<'all' | 'debtors' | 'settled' | 'overdue'>('all');
   const [filterClassificationType, setFilterClassificationType] = useState<'all' | 'distinct' | 'struggling' | 'new'>('all');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+
+  React.useEffect(() => {
+    setIsOptionsOpen(false);
+  }, [selectedCustomerId]);
   const [showPayments, setShowPayments] = useState(true);
   const [showWithdrawals, setShowWithdrawals] = useState(true);
   const [expandedMonths, setExpandedMonths] = useState<string[]>([]);
@@ -86,8 +95,10 @@ export function CustomersTab({
   const [sortType, setSortType] = useState<'default' | 'debt_desc' | 'oldest_debt'>('default');
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [selectedPaperSize, setSelectedPaperSize] = useState<'A4' | '80mm' | '58mm' | undefined>(undefined);
 
   const handlePrint = () => {
+    setSelectedPaperSize('A4');
     setIsExportModalOpen(true);
   };
   
@@ -311,6 +322,7 @@ export function CustomersTab({
     text += `أخوكم ${delName} لتوزيع الأغذية والمشروبات 🌾\n`;
     text += `للاستعلام والطلب: ${delPhone} 📞`;
 
+    triggerHaptic('medium');
     window.open(generateWhatsAppLink(customer.phone, text), '_blank');
   };
 
@@ -414,6 +426,7 @@ export function CustomersTab({
             archivedTransactions={db.transactions.filter(tx => tx.customerId === selectedCustomerId && tx.isArchived)}
             hidePayments={!showPayments}
             hideWithdrawals={!showWithdrawals}
+            initialPaperSize={selectedPaperSize}
           />
         </>
       )}
@@ -674,11 +687,11 @@ export function CustomersTab({
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.15, delay: Math.min(idx * 0.01, 0.1), ease: "easeOut" }}
+                    transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
                     whileHover={{ x: -2 }}
                     style={{ willChange: "transform, opacity" }}
                     onClick={() => setSelectedCustomerId(item.customer.id)}
-                    className={`p-3 bg-white rounded-2xl border cursor-pointer flex items-center justify-between group transition-all duration-150 ${
+                    className={`p-3 bg-white rounded-2xl border cursor-pointer flex items-center justify-between group transition-all duration-150 gpu-accelerated ${
                       isSelected 
                         ? 'border-indigo-500 bg-indigo-50/20 shadow-xs' 
                         : 'border-slate-100 shadow-2xs hover:border-slate-200'
@@ -725,12 +738,12 @@ export function CustomersTab({
           {!activeCustomerInfo ? (
             <motion.div 
               key="placeholder-account"
-              initial={{ opacity: 0, scale: 0.98 }}
+              initial={{ opacity: 0, scale: 0.99 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
+              exit={{ opacity: 0, scale: 0.99 }}
+              transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
               style={{ willChange: "transform, opacity" }}
-              className="h-96 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-100 p-8 text-center text-slate-400 space-y-3"
+              className="h-96 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-100 p-8 text-center text-slate-400 space-y-3 gpu-accelerated"
             >
               <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                 <FileText className="w-8 h-8" />
@@ -744,13 +757,80 @@ export function CustomersTab({
             <motion.div 
               id="print-area"
               key={activeCustomerInfo.customer.id}
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              initial={{ opacity: 0, y: 8, scale: 0.99 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -12, scale: 0.98 }}
-              transition={{ duration: 0.22, ease: "easeOut" }}
+              exit={{ opacity: 0, y: -8, scale: 0.99 }}
+              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
               style={{ willChange: "transform, opacity" }}
-              className="space-y-5 bg-white rounded-2xl border border-slate-100 p-6 shadow-xs relative"
+              className="space-y-5 bg-white rounded-2xl border border-slate-100 p-6 shadow-xs relative gpu-accelerated"
             >
+              
+              {/* Additional Options Dropdown ••• */}
+              <div className="absolute top-6 left-6 z-20 print:hidden">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setIsOptionsOpen(!isOptionsOpen);
+                    }}
+                    className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all cursor-pointer border border-slate-150/60 shadow-3xs"
+                    title="الخيارات الإضافية"
+                  >
+                    <MoreHorizontal className="w-5 h-5" />
+                  </button>
+
+                  <AnimatePresence>
+                    {isOptionsOpen && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-30" 
+                          onClick={() => setIsOptionsOpen(false)} 
+                        />
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                          transition={{ duration: 0.12 }}
+                          className="absolute left-0 mt-2 w-56 rounded-2xl bg-white border border-slate-150 shadow-lg py-2 z-40 text-right origin-top-left"
+                        >
+                          <div className="px-3 py-1.5 border-b border-slate-50 mb-1">
+                            <span className="text-[10px] font-black text-slate-400 block">إجراءات ملف العميل المتقدمة</span>
+                          </div>
+
+                          {/* Edit option */}
+                          <button
+                            onClick={() => {
+                              triggerHaptic('light');
+                              setIsOptionsOpen(false);
+                              onEditCustomerTrigger(activeCustomerInfo.customer);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-all cursor-pointer text-right font-semibold"
+                          >
+                            <Edit className="w-4 h-4 text-slate-400" />
+                            <span>تعديل بيانات العميل</span>
+                          </button>
+
+                          {/* Delete option */}
+                          {isManagerOrAssistant && (
+                            <button
+                              onClick={() => {
+                                triggerHaptic('medium');
+                                setIsOptionsOpen(false);
+                                handleDeleteCustomerClicked(activeCustomerInfo.customer.id, activeCustomerInfo.customer.name);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-all cursor-pointer text-right font-black border-t border-slate-100/80 mt-1 pt-2"
+                            >
+                              <Trash2 className="w-4 h-4 text-rose-500" />
+                              <span>حذف العميل نهائياً</span>
+                            </button>
+                          )}
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
               
           {/* Back Button (Only seen on mobile/tablet) */}
               <button
@@ -788,31 +868,16 @@ export function CustomersTab({
                 </div>
               </div>
 
-              {/* Edit / Delete profile control center */}
+              {/* Print and view filter control center */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-1.5 self-start md:self-center">
                   <button
                     onClick={handlePrint}
-                    className="flex items-center gap-1 px-3 py-1 text-[10px] font-black bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-all cursor-pointer print:hidden shadow-xs"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-all cursor-pointer print:hidden shadow-2xs border border-indigo-100/30"
                   >
-                    <Printer className="w-3 h-3" />
-                    طـبـاعـة
+                    <Printer className="w-3.5 h-3.5" />
+                    خيارات الطباعة والـ POS
                   </button>
-                  <button
-                    onClick={() => onEditCustomerTrigger(activeCustomerInfo.customer)}
-                    className="px-3 py-1 text-[10px] font-black bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all cursor-pointer print:hidden border border-slate-100"
-                  >
-                    تعديل
-                  </button>
-                  {isManagerOrAssistant && (
-                    <button
-                      onClick={() => handleDeleteCustomerClicked(activeCustomerInfo.customer.id, activeCustomerInfo.customer.name)}
-                      className="p-1 px-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-all cursor-pointer print:hidden"
-                      title="حذف"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 print:hidden">
                   <button
@@ -888,15 +953,44 @@ export function CustomersTab({
                   )}
             </div>
 
-            <div className="mt-4 mb-4">
+            <div className="mt-4 mb-4 space-y-2.5">
                <button
-                  onClick={() => setIsExportModalOpen(true)}
+                  onClick={() => {
+                    setSelectedPaperSize('A4');
+                    setIsExportModalOpen(true);
+                  }}
                   className="w-full flex justify-center items-center gap-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all cursor-pointer shadow-md text-lg font-black"
-                  title="تصدير كشف حساب"
+                  title="تصدير كشف حساب عادي"
                 >
                   <FileText className="w-6 h-6" />
                   معاينة وتصدير كشف الحساب
                 </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      setSelectedPaperSize('80mm');
+                      setIsExportModalOpen(true);
+                    }}
+                    className="flex items-center justify-center gap-2 py-3 px-4 bg-slate-900 text-white hover:bg-slate-800 rounded-xl transition duration-150 font-bold hover:shadow-sm cursor-pointer border border-slate-800"
+                    title="تحميل كشف حسّاب مهيأ لطابعات نقاط البيع الحرارية بمقاس 80 مم"
+                  >
+                    <span className="text-lg">🖨️</span>
+                    <span className="text-xs">طباعة POS 80mm</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setSelectedPaperSize('58mm');
+                      setIsExportModalOpen(true);
+                    }}
+                    className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-700 text-white hover:bg-emerald-800 rounded-xl transition duration-150 font-bold hover:shadow-sm cursor-pointer border border-emerald-800"
+                    title="تحميل كشف حسّاب مهيأ لطابعات المناديب والمحاسبين المحمولة بمقاس 58 مم"
+                  >
+                    <span className="text-lg">📱</span>
+                    <span className="text-xs">طباعة مندوب 58mm</span>
+                  </button>
+                </div>
             </div>
 
             {/* Detailed financial status summary for selected customer */}
@@ -984,14 +1078,14 @@ export function CustomersTab({
               
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => onAddTransactionTrigger(activeCustomerInfo.customer.id, 'payment')}
+                  onClick={() => { triggerHaptic('light'); onAddTransactionTrigger(activeCustomerInfo.customer.id, 'payment'); }}
                   className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 py-2 px-3.5 rounded-xl transition-all cursor-pointer"
                 >
                   <Minus className="w-3.5 h-3.5" />
                   تسجيل سداد دفعة
                 </button>
                 <button
-                  onClick={() => onAddTransactionTrigger(activeCustomerInfo.customer.id, 'debt')}
+                  onClick={() => { triggerHaptic('light'); onAddTransactionTrigger(activeCustomerInfo.customer.id, 'debt'); }}
                   className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 py-2 px-3.5 rounded-xl transition-all cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1245,6 +1339,7 @@ export function CustomersTab({
                 </div>
               )}
             </div>
+
 
           </motion.div>
         )}

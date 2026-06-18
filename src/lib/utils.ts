@@ -80,3 +80,41 @@ export function getGeminiHeaders(): Record<string, string> {
   }
   return headers;
 }
+
+/**
+ * Triggers a light haptic feedback vibration on mobile devices that support the Vibration API.
+ * Uses patterns corresponding to light tap, medium impact, or success/warning/error patterns.
+ * This function handles iframe & browser level permission blocks safely.
+ */
+export function triggerHaptic(type: 'light' | 'medium' | 'success' | 'warning' | 'error' = 'light') {
+  if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+    try {
+      switch (type) {
+        case 'light':
+          navigator.vibrate(12);
+          break;
+        case 'medium':
+          navigator.vibrate(30);
+          break;
+        case 'success':
+          // Success: Double short tap
+          navigator.vibrate([20, 40, 20]);
+          break;
+        case 'warning':
+          // Warning: One medium-long pulse
+          navigator.vibrate(80);
+          break;
+        case 'error':
+          // Error: Three fast pulses
+          navigator.vibrate([60, 40, 60, 40, 60]);
+          break;
+        default:
+          navigator.vibrate(12);
+      }
+    } catch (e) {
+      // Ignore vibration errors caused by browser/iframe policy or security limits
+      console.debug('Haptic feedback is not allowed in this environment:', e);
+    }
+  }
+}
+

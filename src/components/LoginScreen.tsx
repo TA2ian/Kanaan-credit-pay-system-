@@ -8,6 +8,49 @@ import { useFirebase } from '../lib/FirebaseContext';
 import { BookOpen, LogIn, Sparkles, Chrome, Mail, Lock, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 
+// ترجمة أخطاء Firebase للغة العربية بشكل دقيق وشامل
+function getArabicAuthErrorMessage(err: any): string {
+  if (!err) return 'حدث خطأ غير معروف.';
+  const code = (err.code || '').toLowerCase();
+  const message = (err.message || '').toLowerCase();
+
+  const matches = (target: string) => code.includes(target) || message.includes(target);
+
+  if (matches('auth/email-already-in-use') || matches('email-already-in-use')) {
+    return 'البريد الإلكتروني هذا مستخدم بالفعل ومسجل لدينا. يرجى استخدام بريد آخر أو تسجيل الدخول.';
+  }
+  if (matches('auth/weak-password') || matches('weak-password')) {
+    return 'كلمة المرور ضعيفة جداً. يجب أن تكون ٦ خانات على الأقل.';
+  }
+  if (matches('auth/wrong-password') || matches('wrong-password') || matches('auth/user-not-found') || matches('user-not-found') || matches('auth/invalid-credential') || matches('invalid-credential')) {
+    return 'البريد الإلكتروني أو كلمة المرور غير صحيحة، أو الحساب غير موجود.';
+  }
+  if (matches('auth/user-disabled') || matches('user-disabled')) {
+    return 'عذراً، تم تعطيل هذا الحساب. يرجى التواصل مع الإدارة لاسترجاع الوصول وإعادة التفعيل.';
+  }
+  if (matches('auth/invalid-email') || matches('invalid-email')) {
+    return 'البريد الإلكتروني المدخل غير صحيح أو بصيغة غير مقبولة.';
+  }
+  if (matches('auth/too-many-requests') || matches('too-many-requests')) {
+    return 'تم إرسال طلبات متكررة خاطئة. تم تجميد الحساب مؤقتاً لحمايته، يرجى الانتظار والمحاولة لاحقاً.';
+  }
+  if (matches('auth/configuration-not-found') || matches('configuration-not-found')) {
+    return 'تنبيه: ميزة تسجيل الدخول بالبريد الإلكتروني مغلقة بقنصل مشروع فايربيس حالياً. يرجى تفعيلها من لوحة تحكم Firebase Console أو استخدام تسجيل دخول Google المتاح فورياً.';
+  }
+  if (matches('auth/operation-not-allowed') || matches('operation-not-allowed')) {
+    return 'طريقة تسجيل الدخول بالبريد الإلكتروني وكلمة المرور غير مفعّلة في مشروع Firebase الخاص بك حالياً. يرجى الذهاب إلى لوحة تحكم Firebase Console -> Authentication -> Sign-in method -> وتفعيل خيار (Email/Password) لتتمكن من التسجيل والدخول بنجاح.';
+  }
+  if (matches('auth/popup-closed-by-user') || matches('popup-closed-by-user') || matches('cancelled-popup-request')) {
+    return 'تم إلغاء عملية الدخول التلقائي من قبلك بسبب إغلاق نافذة المصادقة.';
+  }
+  if (matches('auth/network-request-failed') || matches('network-request-failed')) {
+    return 'خطأ في الشبكة: يرجى التحقق من اتصال الإنترنت وحالة خادم المصادقة.';
+  }
+
+  // Fallback to human readable generic message
+  return 'تعذر إتمام المصادقة الأمنية: ' + (err.message || err);
+}
+
 export function LoginScreen() {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword } = useFirebase();
   const [isSignUp, setIsSignUp] = useState(false);
@@ -29,11 +72,7 @@ export function LoginScreen() {
       setSuccess('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني بنجاح. يرجى مراجعة صندوق الوارد.');
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/user-not-found') {
-        setError('لا يوجد حساب مرتبط بهذا البريد الإلكتروني.');
-      } else {
-        setError('تعذر إرسال رابط استعادة كلمة المرور. تأكد من صحة البريد الإلكتروني.');
-      }
+      setError(getArabicAuthErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -57,19 +96,7 @@ export function LoginScreen() {
       }
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
-        setError('البريد الإلكتروني مستخدم بالفعل بصفتك تاجر.');
-      } else if (err.code === 'auth/weak-password') {
-        setError('كلمة المرور ضعيفة جداً. يجب أن تكون ٦ خانات على الأقل.');
-      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
-      } else if (err.code === 'auth/user-disabled') {
-        setError('عذراً، تم تعطيل هذا الحساب. يرجى التواصل مع الإدارة لاسترجاع الوصول.');
-      } else if (err.message && err.message.includes('auth/configuration-not-found')) {
-        setError('تنبيه: ميزة تسجيل الدخول بالبريد الإلكتروني مغلقة بقنصل مشروع فايربيس حالياً. يرجى تفعيلها من لوحة تحكم Firebase Console أو استخدام تسجيل دخول Google المتاح فورياً.');
-      } else {
-        setError('حدث خطأ أثناء المصادقة الأمنية: ' + (err.message || err));
-      }
+      setError(getArabicAuthErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -83,11 +110,7 @@ export function LoginScreen() {
       setSuccess('مرحباً بك! تم التفويض الآمن عبر حساب Google.');
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/user-disabled') {
-        setError('عذراً، تم تعطيل هذا الحساب. يرجى التواصل مع الإدارة لاسترجاع الوصول.');
-      } else {
-        setError('فشلت عملية المصادقة عبر Google. يرجى التأكد من اتصال الخادم وإعادة المحاولة.');
-      }
+      setError(getArabicAuthErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -96,11 +119,11 @@ export function LoginScreen() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 transition-colors duration-300" dir="rtl">
       <motion.div 
-        initial={{ opacity: 0, y: 25, scale: 0.96 }}
+        initial={{ opacity: 0, y: 15, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", duration: 0.55, bounce: 0.12 }}
+        transition={{ type: "spring", stiffness: 380, damping: 28 }}
         style={{ willChange: 'transform, opacity' }}
-        className="w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden flex flex-col transition-colors duration-300"
+        className="w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden flex flex-col transition-colors duration-300 gpu-accelerated"
       >
         
         {/* Decorative Top Branding */}

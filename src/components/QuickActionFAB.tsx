@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Minus, DollarSign, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { triggerHaptic } from '../lib/utils';
 
 interface QuickActionFABProps {
   onAddDebt: () => void;
@@ -21,7 +22,7 @@ export function QuickActionFAB({ onAddDebt, onAddPayment }: QuickActionFABProps)
               exit={{ opacity: 0, scale: 0.8, y: 0 }}
               transition={{ type: "spring", stiffness: 500, damping: 25 }}
               style={{ willChange: "transform, opacity" }}
-              onClick={() => { onAddDebt(); setIsOpen(false); }}
+              onClick={() => { triggerHaptic('medium'); onAddDebt(); setIsOpen(false); }}
               className="absolute right-0 flex items-center gap-2 bg-rose-600 text-white p-2.5 rounded-full shadow-lg cursor-pointer hover:bg-rose-700 transition-colors duration-150"
               title="سحب بضاعة جديد"
             >
@@ -34,7 +35,7 @@ export function QuickActionFAB({ onAddDebt, onAddPayment }: QuickActionFABProps)
               exit={{ opacity: 0, scale: 0.8, y: 0 }}
               transition={{ type: "spring", stiffness: 500, damping: 25 }}
               style={{ willChange: "transform, opacity" }}
-              onClick={() => { onAddPayment(); setIsOpen(false); }}
+              onClick={() => { triggerHaptic('medium'); onAddPayment(); setIsOpen(false); }}
               className="absolute right-0 flex items-center gap-2 bg-emerald-600 text-white p-2.5 rounded-full shadow-lg cursor-pointer hover:bg-emerald-700 transition-colors duration-150"
               title="تسديد دفعة جديد"
             >
@@ -46,7 +47,7 @@ export function QuickActionFAB({ onAddDebt, onAddPayment }: QuickActionFABProps)
       </AnimatePresence>
       
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { triggerHaptic('light'); setIsOpen(!isOpen); }}
         className="bg-indigo-600 text-white p-3.5 rounded-full shadow-xl cursor-pointer hover:bg-indigo-700 active:scale-95 transition-colors duration-150"
       >
         <motion.div 
@@ -60,3 +61,4 @@ export function QuickActionFAB({ onAddDebt, onAddPayment }: QuickActionFABProps)
     </div>
   );
 }
+

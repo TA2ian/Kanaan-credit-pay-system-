@@ -157,7 +157,26 @@ export function GuideTab() {
           </div>
         </div>
 
-        {/* Section 10 */}
+        {/* Section 10: Team Permissions & Representatives Management */}
+        <div className="bg-white p-6 rounded-2xl border border-indigo-50 bg-indigo-50/5 shadow-sm transition hover:shadow-md transition-colors">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 transition-colors">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 mb-2 transition-colors">إدارة فريق العمل والمناديب</h3>
+              <p className="text-sm text-slate-500 leading-relaxed transition-colors">
+                نظام صلاحيات متكامل للمؤسسات يتيح للمدير دعوة الموظفين عبر البريد الإلكتروني وتوزيع الأدوار بدقة: 
+                <span className="block mt-1 font-semibold text-slate-700">
+                  • مدير عام (التحكم الكامل والتهيئة) • مساعد (إدارة الحسابات بالميدان) • محاسب (مراقبة الحسابات) • مندوب توزيع (تسجيل الديون والتحصيل)
+                </span>
+                تتم مزامنة نشاطات الفريق لحظياً، مع إمكانية تتبع آخر ظهور للموظفين وإلغاء صلاحياتهم فورياً.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 11 */}
         <div className="bg-rose-50/60 p-6 rounded-2xl border border-rose-100 shadow-sm transition hover:shadow-md col-span-1 md:col-span-2 transition-colors">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 transition-colors">
@@ -172,7 +191,7 @@ export function GuideTab() {
           </div>
         </div>
 
-        {/* Section 11 */}
+        {/* Section 12 */}
         <div className="bg-gradient-to-br from-indigo-50/60 to-slate-50 border border-indigo-100/60 p-6 rounded-2xl shadow-sm transition hover:shadow-md col-span-1 md:col-span-2 transition-colors">
           <div className="flex flex-col md:flex-row items-start gap-5">
             <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-100 transition-colors">

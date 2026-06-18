@@ -1,10 +1,10 @@
 {
-  "projectId": "rock-icon-8lsxp",
-  "appId": "1:502855432748:web:bcfbb80ba5e97fa02c6f89",
-  "apiKey": "AIzaSyAkiFzSF5SvNXolOJEdQvG1mc6Gj0fhnMc",
-  "authDomain": "rock-icon-8lsxp.firebaseapp.com",
+  "projectId": "kanaan-credit-app",
+  "appId": "1:175620537806:web:e197677e4f680c0094bf9f",
+  "apiKey": "AIzaSyC0OVk_RuEyrfJVeV-cazHFLKH1TNFxZIg",
+  "authDomain": "kanaan-credit-app.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-48ffa666-fa04-488b-abeb-bb659b49e38d",
-  "storageBucket": "rock-icon-8lsxp.firebasestorage.app",
-  "messagingSenderId": "502855432748",
-  "measurementId": ""
+  "storageBucket": "kanaan-credit-app.firebasestorage.app",
+  "messagingSenderId": "175620537806",
+  "measurementId": "G-R1KQP3L96K"
 }
